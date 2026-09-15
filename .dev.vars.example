@@ -1,0 +1,8 @@
+# 本地独立开发模式，仅 Vite dev + loopback + 此开关同时满足才生效。
+DEV_LOCAL=true
+# 可选模型接线，密钥仅在服务端使用。
+# OPENAI_API_KEY=
+# OPENAI_BASE_URL=https://api.siliconflow.cn/v1
+# MODEL_NAME=deepseek-ai/DeepSeek-V3
+# wenchao 检索端点部署后配置；这里是其 API_KEYS 中有效的服务 key。
+# WENCHAO_API_KEY=

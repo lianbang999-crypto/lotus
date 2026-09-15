@@ -1,0 +1,22 @@
+{
+  "verifiedAt": "2026-09-12T23:16:58.105Z",
+  "sourcePublicDir": "/Users/bincai/Downloads/foyue/foyue01/public",
+  "libraryGeneratedAt": "2026-08-15",
+  "libraryHash": "696d7c2bbd2aeab4754efe6bd4bbc3b7a1ec3544102b8864a7b24a4d2999ac61",
+  "articles": 1061,
+  "paragraphs": 15529,
+  "characters": 5160988,
+  "excluded": [
+    {
+      "series": "jing",
+      "reason": "sutras_and_prefaces",
+      "count": 14
+    }
+  ],
+  "corpus": "daan",
+  "role": "guide",
+  "remoteWrites": 0,
+  "batches": 133,
+  "chunks": 18006,
+  "validation": "Local source parsing, schema, content hash, chunking; no provider calls or remote writes"
+}
