@@ -35,5 +35,13 @@
     "WENCHAO_API_URL": "https://wenchao.foyue.org/api/retrieve",
     "MODEL_NAME": "deepseek-ai/DeepSeek-V3",
     "OPENAI_BASE_URL": "https://api.siliconflow.cn/v1"
-  }
+  },
+  // 必须挂在 foyue.org 子域下：auth.foyue.org 的会话 Cookie 域是 .foyue.org，
+  // 上游 trustedOrigins 也只放行 https://*.foyue.org。换成 workers.dev 登录必然失败。
+  "routes": [
+    {
+      "pattern": "lotus.foyue.org",
+      "custom_domain": true
+    }
+  ]
 }
