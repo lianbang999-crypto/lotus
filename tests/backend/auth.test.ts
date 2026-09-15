@@ -19,7 +19,8 @@ describe("Lotus identity boundary", () => {
     expect(result).toEqual({ ...profile, mode: "cloud" });
     const [url, options] = vi.mocked(fetch).mock.calls[0];
     expect(url).toBe(AUTH_ORIGIN + "/api/accounts/me");
-    expect(options?.redirect).toBe("error");
+    // Workers 不支持 "error"，只能 "manual" + 由 authFetch 自己判 3xx。
+    expect(options?.redirect).toBe("manual");
     expect(options?.signal).toBeInstanceOf(AbortSignal);
     const headers = new Headers(options?.headers);
     expect(headers.get("X-Account-Id")).toBeNull();

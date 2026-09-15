@@ -53,7 +53,9 @@ async function authFetch(path: string, init: RequestInit = {}): Promise<Response
   try {
     const response = await fetch(AUTH_ORIGIN + path, {
       ...init,
-      redirect: "error",
+      // Workers 运行时只接受 "follow" / "manual"；传 "error" 会直接抛 TypeError，
+      // 被下面的 catch 吞成「账号服务不可用」，登录链路必然全挂。拒绝跳转改由下一行判断。
+      redirect: "manual",
       signal: AbortSignal.timeout(8000),
     });
     if (response.status >= 300 && response.status < 400) throw unavailable();

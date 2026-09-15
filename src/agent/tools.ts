@@ -22,7 +22,8 @@ export async function searchDharma(env: RetrievalEnv, input: { query: string; co
     const endpoint = new URL(env.WENCHAO_API_URL);
     if (endpoint.protocol !== "https:") return { ok: false, error: { code: "RETRIEVAL_CONFIG_INVALID", message: "检索地址必须使用 HTTPS。" } };
     const response = await fetch(endpoint, {
-      method: "POST", redirect: "error", signal: AbortSignal.timeout(20000),
+      // 同 auth.ts：Workers 不支持 redirect: "error"。3xx 由下面的 !response.ok 拦下。
+      method: "POST", redirect: "manual", signal: AbortSignal.timeout(20000),
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.WENCHAO_API_KEY}` },
       body: JSON.stringify({ ...input, rewrite: false }),
     });

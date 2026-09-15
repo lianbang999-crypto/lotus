@@ -33,7 +33,8 @@ describe("real retrieval adapter response boundary", () => {
     expect(await searchDharma(env, input)).toMatchObject({ok: true, basisAvailable: true, passages: [passage]});
     const [url, request] = fetcher.mock.calls[0];
     expect(String(url)).toBe(env.WENCHAO_API_URL);
-    expect(request.redirect).toBe("error");
+    // Workers 不支持 "error"，只能 "manual" + 由 !response.ok 拦 3xx。
+    expect(request.redirect).toBe("manual");
     expect(request.headers.Authorization).toBe("Bearer fixture-test-key");
     expect(JSON.parse(request.body)).toEqual({...input, rewrite: false});
   });
