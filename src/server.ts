@@ -15,9 +15,77 @@ type LotusEnv = Env & {
   OPENAI_BASE_URL?: string;
   WENCHAO_API_KEY?: string;
   AI?: Ai;
+  VOICE_AUDIO?: R2Bucket;
 };
 const json = (value: unknown, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
 const modelReady = (env: LotusEnv) => Boolean(env.OPENAI_API_KEY || env.AI);
+const voiceReady = (env: LotusEnv) => Boolean(env.AI);
+const VOICE_MODEL = "@cf/openai/whisper-large-v3-turbo";
+const VOICE_MAX_BYTES = 5_000_000;
+const VOICE_MAX_MS = 90_000;
+const voiceKey = (accountId: string, id: string) => `voice/${accountId}/${id}.wav`;
+/** 客户端统一上传 44 字节标准头的 16 kHz 单声道 WAV；时长从字节数算，不信任客户端上报。 */
+export function wavDurationMs(bytes: Uint8Array): number | null {
+  const tag = (offset: number) => String.fromCharCode(...bytes.subarray(offset, offset + 4));
+  if (bytes.byteLength < 44 || tag(0) !== "RIFF" || tag(8) !== "WAVE" || tag(36) !== "data") return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const bytesPerSecond = view.getUint16(22, true) * view.getUint32(24, true) * (view.getUint16(34, true) / 8);
+  if (!bytesPerSecond) return null;
+  return Math.round(((bytes.byteLength - 44) / bytesPerSecond) * 1000);
+}
+function toBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+}
+/**
+ * 语音条：转写与回放都在 Worker 层完成，不进 Durable Object。
+ * 模型只拿到转写文字（走原有 sendMessage），音频只用于回放，按账号前缀存 R2。
+ */
+async function handleVoice(request: Request, env: LotusEnv, accountId: string): Promise<Response> {
+  const path = new URL(request.url).pathname;
+  if (request.method === "POST" && path === "/api/voice/transcribe") {
+    if (!voiceReady(env)) throw new AppError("VOICE_NOT_CONFIGURED", "语音识别尚未配置", 503);
+    if (!request.headers.get("content-type")?.toLowerCase().startsWith("audio/wav")) throw new AppError("VOICE_FORMAT", "请上传 WAV 音频", 415);
+    if (Number(request.headers.get("content-length") ?? 0) > VOICE_MAX_BYTES) throw new AppError("VOICE_TOO_LARGE", "录音太长了，请分段说", 413);
+    const bytes = new Uint8Array(await request.arrayBuffer());
+    if (bytes.byteLength > VOICE_MAX_BYTES) throw new AppError("VOICE_TOO_LARGE", "录音太长了，请分段说", 413);
+    const durationMs = wavDurationMs(bytes);
+    if (durationMs === null) throw new AppError("VOICE_INVALID", "录音格式不正确", 400);
+    if (durationMs > VOICE_MAX_MS) throw new AppError("VOICE_TOO_LONG", "一段最多 90 秒，请分段说", 413);
+    const result = (await env.AI!.run(VOICE_MODEL, { audio: toBase64(bytes), language: "zh", task: "transcribe", vad_filter: true })) as { text?: string };
+    const text = (result.text ?? "").trim();
+    let audioId: string | null = null;
+    if (env.VOICE_AUDIO) {
+      audioId = crypto.randomUUID();
+      await env.VOICE_AUDIO.put(voiceKey(accountId, audioId), bytes, { httpMetadata: { contentType: "audio/wav" }, customMetadata: { durationMs: String(durationMs) } });
+    }
+    return json({ text, audioId, durationMs });
+  }
+  const match = request.method === "GET" ? path.match(/^\/api\/voice\/audio\/([0-9a-f-]{36})$/) : null;
+  if (match) {
+    // Content-Range 按请求头自己算：R2 返回的 range 对象在本地模拟器里字段会是 undefined，不能依赖它。
+    const spec = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get("Range") ?? "");
+    const range = spec && (spec[1] || spec[2]) ? { start: spec[1] ? Number(spec[1]) : null, end: spec[2] ? Number(spec[2]) : null } : null;
+    const object = env.VOICE_AUDIO ? await env.VOICE_AUDIO.get(voiceKey(accountId, match[1]), range ? { range: request.headers } : undefined) : null;
+    if (!object) throw new AppError("NOT_FOUND", "这段语音已不存在", 404);
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set("Content-Type", "audio/wav");
+    headers.set("Cache-Control", "private, max-age=86400");
+    headers.set("Accept-Ranges", "bytes");
+    headers.set("X-Content-Type-Options", "nosniff");
+    if (range) {
+      // bytes=a-b / bytes=a- / bytes=-n 三种写法；浏览器 <audio> 只会发前两种。
+      const start = range.start ?? Math.max(0, object.size - (range.end ?? 0));
+      const end = range.start === null ? object.size - 1 : Math.min(range.end ?? object.size - 1, object.size - 1);
+      headers.set("Content-Range", `bytes ${start}-${end}/${object.size}`);
+      return new Response(object.body, { status: 206, headers });
+    }
+    return new Response(object.body, { headers });
+  }
+  throw new AppError("NOT_FOUND", "接口不存在", 404);
+}
 /** 给模型的“现在”必须是北京时间：用户按北京日期记录，UTC 日期在每天 0–8 点会差一天。 */
 export function beijingNow(now = new Date()) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "long", hourCycle: "h23" }).formatToParts(now).map((p) => [p.type, p.value]));
@@ -202,13 +270,15 @@ export default {
           authenticated: Boolean(session),
           user: session ? { accountId: session.accountId, name: session.name, isAnonymous: session.isAnonymous } : null,
           mode: session?.mode === "local" ? "local" : modelReady(env) ? "cloud" : "unconfigured",
-          capabilities: { chat: canWrite && modelReady(env), entries: canWrite, write: canWrite, dharma: Boolean(env.WENCHAO_API_KEY), reminders: "in_app" },
+          capabilities: { chat: canWrite && modelReady(env), entries: canWrite, write: canWrite, dharma: Boolean(env.WENCHAO_API_KEY), voice: canWrite && voiceReady(env), reminders: "in_app" },
           ...(!modelReady(env) ? { message: "语言模型尚未配置，可先使用记录表单。" } : {}),
         };
         return json(info);
       }
       if (!session) throw new AppError("UNAUTHENTICATED", "请先登录你的佛悦账号", 401);
       if (session.isAnonymous) throw new AppError("ACCOUNT_UPGRADE_REQUIRED", "请先升级为正式账号，以免匿名账号变更时遗失个人记录", 403);
+      // 必须 await：async 函数在 try 里直接 return Promise，拒绝会绕过下面的 catch。
+      if (path.startsWith("/api/voice/")) return await handleVoice(request, env, session.accountId);
       const knownPersonal = path === "/api/entries" || path === "/api/proposals" || /^\/api\/proposals\/[a-zA-Z0-9_-]{1,100}\/(approve|reject)$/.test(path);
       const chatPath = path === "/api/agent" || path === "/api/agent/get-messages";
       if (!knownPersonal && !chatPath) return json({ error: "NOT_FOUND", message: "接口不存在" }, 404);

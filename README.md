@@ -35,6 +35,7 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 - SDK 版本固定 `@cloudflare/ai-chat@0.9.3`：实测 0.9.4 调用 Agents 0.17.4 不存在的 `_withAgentSpan`，导致 DO 无法启动。另固定 `ai@6.0.202` 与 `@ai-sdk/react@3.0.204` 以保持原生工具续答兼容。请保留 lockfile，升级时运行客户端解析器和真实 Worker 浏览器流程。
 - `searchDharma` 只调用原有 wenchao 检索，严格验证语料角色和来源地址。来源卡将原文与解释区分。
 - 聊天回复的 Markdown 由 Streamdown 渲染，但**不启用 `rehype-raw`**：模型输出的原始 HTML 以纯文本显示而非进入 DOM。这既是安全边界，也让首屏分包省掉 parse5（Chat 分包 909→739 kB，gzip 266→214）。约束由 `src/lib/rehype-raw-stub.ts`、`vite.config.ts` 的 alias 与 `tests/backend/markdown-safety.test.ts` 三处共同保证，改动前请先看该测试的注释。
+- **语音条**（2026-09-16）：输入框旁「按住说话」，松开即发、上滑取消。客户端把录音重采样成 16 kHz WAV 上传，服务端用 Workers AI `whisper-large-v3-turbo`（`language: zh`）转写，原音按账号前缀存 R2 供回放（支持 Range）。**模型只看到转写文字**，走同一个 `sendMessage`，工具与确认卡一行不动；想改转写用「改一改」。
 
 ## UI/UX 技术栈（真实在用）
 
@@ -51,6 +52,7 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 | 样式工具 | `clsx` + `tailwind-merge` + `class-variance-authority` | · MIT / Apache-2.0 | shadcn 式 `cn()` 与 Button 变体 |
 | 日历 | [Schedule-X](https://schedule-x.dev/) | 4.8.0 · MIT | 月视图 / 议程视图（抽屉内，懒加载） |
 | 热力图 | [cal-heatmap](https://cal-heatmap.com/) | 4.2.4 · MIT | 功课与省察足迹（抽屉内，懒加载） |
+| 语音转写 | Workers AI `@cf/openai/whisper-large-v3-turbo` + R2 | 平台服务 · $0.000513/分钟 | 语音条转写与原音回放；`wrangler.jsonc` 的 `ai` / `r2_buckets` 绑定，本地开发 AI 走 `remote: true` |
 
 **只是设计参考、未引入代码**：Zola（布局）、prompt-kit（视觉细节）、Haven（陪伴感）、以及 AIRI / KouriChat / Everthine / SillyTavern / EverOtome 等陪伴类项目的交互取舍，分别见 [设计调研](docs/design-references.md) 与 [陪伴类项目调研](docs/companion-references.md)。
 

@@ -3445,3 +3445,106 @@ button svg {
     width: 22px;
   }
 }
+
+/* ===== 语音条（按住说话 / 发出去 / 回放）===== */
+.composer-voice {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: #859275;
+  border: 1px solid #e7ecdf;
+  background: #fbfcf8;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background 0.18s, color 0.18s, transform 0.18s;
+}
+.composer-voice:hover:not(:disabled) {
+  background: #f1f5e9;
+  color: #536a47;
+}
+.composer-voice:disabled {
+  opacity: 0.45;
+}
+.composer-voice.is-recording {
+  background: #536a47;
+  color: #fff;
+  border-color: #536a47;
+  transform: scale(1.06);
+}
+.composer-voice.is-processing {
+  color: #a4b491;
+}
+.voice-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #6f7f5f;
+  padding: 0 0 10px;
+}
+.voice-status i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c8503f;
+  animation: voice-pulse 1s ease-in-out infinite;
+}
+.voice-status.is-processing i {
+  background: #a7b993;
+  animation: skeleton-breathe 1.2s ease-in-out infinite;
+}
+.voice-status .text-link {
+  margin-left: auto;
+}
+@keyframes voice-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.7); }
+}
+/* 块级 + 靠右：语音胶囊在上、转写文字在下，长句在手机上不并排挤在一行。 */
+.voice-clip {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px 7px 7px;
+  border-radius: 999px;
+  background: #dfe9cf;
+  color: #3f5133;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.voice-clip button {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #536a47;
+  color: #fff;
+  flex: none;
+}
+.voice-clip .voice-bars {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+}
+.voice-clip .voice-bars i {
+  width: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.55;
+}
+.voice-clip time {
+  font-variant-numeric: tabular-nums;
+}
+.message-user .voice-clip {
+  margin-left: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-status i { animation: none; }
+  .composer-voice.is-recording { transform: none; }
+}

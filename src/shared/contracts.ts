@@ -39,7 +39,9 @@ export type SessionInfo = {
   authenticated: boolean;
   user: { accountId: string; name: string; isAnonymous: boolean } | null;
   mode: "cloud" | "local" | "unconfigured";
-  capabilities: { chat: boolean; entries: boolean; write: boolean; dharma: boolean; reminders: "in_app" };
+  capabilities: { chat: boolean; entries: boolean; write: boolean; dharma: boolean; voice: boolean; reminders: "in_app" };
   message?: string;
 };
+/** 语音条：挂在用户消息 metadata.voice 上；模型只看到转写文字，音频只用于回放。 */
+export type VoiceMeta = { audioId: string | null; durationMs: number };
 export type APIError = { error: string; message: string };

@@ -35,6 +35,9 @@ import {
   CopyIcon,
   PencilSimpleIcon,
   BookmarkSimpleIcon,
+  MicrophoneIcon,
+  PlayIcon,
+  PauseIcon,
 } from "@phosphor-icons/react";
 import { Button } from "../ui/button";
 import { Dialog } from "../ui/dialog";
@@ -46,8 +49,10 @@ import {
   type EntryKind,
   type Proposal,
   type SessionInfo,
+  type VoiceMeta,
 } from "../../shared/contracts";
 import { useDraft } from "./useDraft";
+import { transcribeVoice, useVoiceRecorder, type VoiceRecorderState } from "./useVoiceRecorder";
 
 type ChatProps = {
   initialPrompt: string;
@@ -325,6 +330,115 @@ function MessageStamp({ at }: { at: number | null }) {
     <time className="message-time" dateTime={new Date(at).toISOString()}>
       {timeFormat.format(new Date(at))}
     </time>
+  );
+}
+/** 语音条元数据：模型只看到转写文字，这里只决定要不要显示可回放的语音气泡。 */
+function voiceMeta(message: UIMessage): VoiceMeta | null {
+  const voice = (message.metadata as { voice?: Partial<VoiceMeta> } | undefined)?.voice;
+  if (!voice || typeof voice.durationMs !== "number") return null;
+  return { audioId: typeof voice.audioId === "string" ? voice.audioId : null, durationMs: voice.durationMs };
+}
+const clipLength = (ms: number) => {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+};
+/** 可回放的语音气泡：音频是同源请求，自带登录 Cookie；没有 audioId（R2 未配置）时只显示时长。 */
+function VoiceClip({ meta }: { meta: VoiceMeta }) {
+  const audio = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const bars = useMemo(() => Array.from({ length: 14 }, (_, i) => 5 + ((i * 7) % 11)), []);
+  function toggle() {
+    const element = audio.current;
+    if (!element) return;
+    if (element.paused) void element.play().catch(() => setPlaying(false));
+    else element.pause();
+  }
+  return (
+    <span className="voice-clip">
+      {meta.audioId && (
+        <>
+          <button type="button" onClick={toggle} aria-label={playing ? "暂停" : "播放语音"}>
+            {playing ? <PauseIcon size={15} weight="fill" /> : <PlayIcon size={15} weight="fill" />}
+          </button>
+          <audio
+            ref={audio}
+            src={`/api/voice/audio/${meta.audioId}`}
+            preload="none"
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+          />
+        </>
+      )}
+      <span className="voice-bars" aria-hidden="true">
+        {bars.map((height, i) => (
+          <i key={i} style={{ height }} />
+        ))}
+      </span>
+      <time>{clipLength(meta.durationMs)}</time>
+    </span>
+  );
+}
+/**
+ * 按住说话：按下开始、抬起发送、上滑 60px 取消。显式 setPointerCapture 让鼠标和触屏
+ * 都能在按钮外抬起仍收到 pointerup；不用 pointerleave 判取消，触屏的隐式捕获会让它在抬起时误触发。
+ */
+function VoiceButton({
+  state,
+  disabled,
+  onStart,
+  onStop,
+  onCancel,
+}: {
+  state: VoiceRecorderState;
+  disabled: boolean;
+  onStart: () => void;
+  onStop: () => void;
+  onCancel: () => void;
+}) {
+  const origin = useRef<{ x: number; y: number } | null>(null);
+  const recording = state === "recording";
+  return (
+    <button
+      type="button"
+      className={`composer-voice ${recording ? "is-recording" : ""} ${state === "processing" ? "is-processing" : ""}`}
+      disabled={disabled || state === "processing"}
+      aria-label={recording ? "松开发送语音" : "按住说话"}
+      aria-pressed={recording}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        origin.current = { x: e.clientX, y: e.clientY };
+        onStart();
+      }}
+      onPointerMove={(e) => {
+        const from = origin.current;
+        if (!from) return;
+        if (from.y - e.clientY > 60 || Math.abs(e.clientX - from.x) > 120) {
+          origin.current = null;
+          onCancel();
+        }
+      }}
+      onPointerUp={() => {
+        if (!origin.current) return;
+        origin.current = null;
+        onStop();
+      }}
+      onPointerCancel={() => {
+        origin.current = null;
+        onCancel();
+      }}
+      onKeyDown={(e) => {
+        if ((e.key === " " || e.key === "Enter") && !e.repeat) {
+          e.preventDefault();
+          (recording ? onStop : onStart)();
+        }
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <MicrophoneIcon size={19} weight={recording ? "fill" : "regular"} />
+    </button>
   );
 }
 /** 上一条消息缺时间戳时沿用最近一条已知时间，保证按天分组稳定。 */
@@ -932,6 +1046,30 @@ function ConnectedChat(props: ChatProps) {
   const focusComposer = useCallback(() => {
     composer.current?.querySelector("textarea")?.focus();
   }, []);
+  // 语音条：录完转写 → 走同一个 sendMessage；模型只看到文字，音频引用只挂在 metadata 里供回放。
+  const voiceReady = Boolean(props.session?.capabilities.voice);
+  const [voiceError, setVoiceError] = useState("");
+  const voice = useVoiceRecorder(
+    async (clip) => {
+      setVoiceError("");
+      const result = await transcribeVoice(clip.wav);
+      if (!result.text) {
+        setVoiceError("没听清，再说一次试试。");
+        return;
+      }
+      if (!canSendRef.current) {
+        runtime.thread.composer.setText(result.text);
+        setVoiceError("现在还不能发送，已把这段话放进输入框。");
+        return;
+      }
+      draftStore.clear();
+      await sendMessage({
+        text: result.text,
+        metadata: { createdAt: Date.now(), voice: { audioId: result.audioId, durationMs: result.durationMs } },
+      });
+    },
+    setVoiceError,
+  );
   function select(text: string) {
     runtime.thread.composer.setText(text);
     focusComposer();
@@ -996,6 +1134,7 @@ function ConnectedChat(props: ChatProps) {
                   <MessageStamp at={at} />
                   {editing === message.id && <em className="message-editing">正在改这一条</em>}
                 </span>
+                {message.role === "user" && voiceMeta(message) && <VoiceClip meta={voiceMeta(message)!} />}
                 {message.parts.map((part, i) =>
                   isToolUIPart(part) ? (
                     <ToolCard key={i} part={part} entries={props.entries} onApproval={approve} />
@@ -1103,6 +1242,27 @@ function ConnectedChat(props: ChatProps) {
               )}
             </p>
           )}
+          {voice.state !== "idle" && (
+            <p className={`voice-status ${voice.state === "processing" ? "is-processing" : ""}`} role="status" aria-live="polite">
+              <i />
+              {voice.state === "recording"
+                ? `正在听… ${Math.floor(voice.elapsedMs / 1000)} 秒 · 松开发送，上滑取消`
+                : "正在把这段话转成文字…"}
+              {voice.state === "recording" && (
+                <button type="button" className="text-link" onClick={voice.cancel}>
+                  取消
+                </button>
+              )}
+            </p>
+          )}
+          {voiceError && (
+            <p role="alert" className="error-text chat-error">
+              <span>{voiceError}</span>
+              <button type="button" className="text-link" onClick={() => setVoiceError("")}>
+                知道了
+              </button>
+            </p>
+          )}
           <ComposerPrimitive.Root className="agent-composer">
             <ComposerPrimitive.Input
               aria-label="发送给小莲"
@@ -1115,6 +1275,15 @@ function ConnectedChat(props: ChatProps) {
             />
             <div className="agent-composer-toolbar">
               <RecordMenu onCreate={props.onCreate} />
+              {voiceReady && (
+                <VoiceButton
+                  state={voice.state}
+                  disabled={!canSend || running}
+                  onStart={() => void voice.start()}
+                  onStop={voice.stop}
+                  onCancel={voice.cancel}
+                />
+              )}
               <span className="composer-mode">
                 <LotusMark size={15} />
                 小莲伴修

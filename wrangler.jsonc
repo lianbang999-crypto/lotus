@@ -15,6 +15,18 @@
       "/health"
     ]
   },
+  // 语音条转写（Whisper）；remote: true 让本地开发也走真实 Workers AI，不做本地模拟。
+  "ai": {
+    "binding": "AI",
+    "remote": true
+  },
+  // 语音条原音（16 kHz WAV），按账号前缀 voice/<accountId>/ 隔离，供回放。
+  "r2_buckets": [
+    {
+      "binding": "VOICE_AUDIO",
+      "bucket_name": "lotus-voice-audio"
+    }
+  ],
   "durable_objects": {
     "bindings": [
       {

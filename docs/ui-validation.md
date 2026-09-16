@@ -106,3 +106,19 @@ WRANGLER_LOG_PATH=/tmp/lotus-chat-ui-wrangler.log npx vite --config tests/backen
 - **懒加载已生效**：冷启动聊天页不请求 Heatmap / CalendarPage / cal-heatmap / schedule-x，无需再拆。
 
 改动后重跑上一轮的全部陪伴功能回归，均通过（时段问候此次为「晚上好」、起手句首位变为「说说今天的心情」「做一次省察」，验证了时段逻辑随时间变化）。`wrangler deploy --dry-run` 通过，产物无 `.dev.vars`、无真实密钥。
+
+## 2026-09-16 语音条（阶段 1）：按住说话、发出去、可回放
+
+按 2026-09-16 计划（三套主题 / 布局 / 语音条 / 实时通话）的阶段 1 落地，**不升级任何依赖**，只加 `ai`（`remote: true`）与 R2 `VOICE_AUDIO` 两个绑定。`tsc` / `oxlint` / 110 项单测（新增 `tests/backend/voice.test.ts` 9 项）/ 生产构建 / `wrangler deploy --dry-run` 全过。
+
+设计要点：客户端 `useVoiceRecorder.ts` 用 `MediaRecorder` 录音后统一解码重采样成 16 kHz 单声道 WAV 再上传（绕开 Chrome webm / iOS mp4 的容器差异）；服务端 `/api/voice/transcribe` 只收标准 44 字节头的 WAV、时长从字节数算、≤ 5 MB / 90 秒，调 Workers AI Whisper（`language: zh`, `vad_filter`），原音按 `voice/<accountId>/` 前缀存 R2；`/api/voice/audio/:id` 只读本账号前缀。**模型只看到转写文字**（`sendMessage` 的 `metadata.voice` 仅供气泡回放），工具、确认卡、系统提示都没动。
+
+真实验证（本地 dev，AI 为远程 Workers AI）：
+
+- 用 macOS `say -v Tingting` 合成 3.83 s 普通话「今天念佛五百声，心里很平静。」。curl 直打路由：转写返回**「今天念佛五百声,心里很平静。」**，一字不差；回放 md5 与上传一致；错误 id 404。本地经远程绑定调用耗时 14 s，**部署后需重新测量**（本机→Cloudflare→AI 的往返不代表线上）。
+- 浏览器端到端（`tests/browser/voice-flow.sh`，Playwright 假麦克风）：找到「按住说话」→ `mousedown` 约 5 s → `mouseup` → 状态行「正在把这段话转成文字…」→ 语音气泡（播放键 + 波形 + `0:05`）+ 转写段落 → 小莲回复。点播放后 `<audio>` 播到结尾（`currentTime = duration = 4.98`，无 error）。1280×800 与 390×844 截图核对，气泡在转写上方堆叠、无横向溢出。
+- 两处真 bug 由这轮测出并已修：① `fetch` 里 `return handleVoice()` 没有 `await`，`AppError` 绕过 catch 变成 500——改为 `return await`；② 回放的 `Content-Range` 依赖 R2 返回的 range 对象，本地模拟器给的字段是 `undefined`，算出 `NaN-NaN`，且无 Range 也返回 206——改为按请求头自算，三种写法进单测。
+
+测试环境的坑（记下来防止以后再踩）：**macOS 上 Chromium 的音频服务是沙箱化独立进程，读不到 `--use-file-for-fake-audio-capture` 的文件**，录到的是纯静音（RMS 0），换 16 k / 48 k 采样率都没用；加 `--disable-features=AudioServiceOutOfProcess,AudioServiceSandbox` 后才有声。另外每条 `playwright-cli` 命令有约 2 s 启动开销，"按住 2 秒"实际录到约 5 秒，不是时长 bug。
+
+未做 / 未验：真机 iPhone 微信内置浏览器与安卓 Chrome 尚未手测（`MediaRecorder` 在 iOS 出 mp4/aac，已按重采样路径设计但未在真机跑过）；线上延迟未量。
