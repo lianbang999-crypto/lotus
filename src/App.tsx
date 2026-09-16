@@ -1,15 +1,7 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import * as Navigation from "@radix-ui/react-dialog";
 import {
-  HouseSimpleIcon,
-  ChatCircleDotsIcon,
-  FlowerLotusIcon,
-  NotebookIcon,
-  HeartIcon,
-  WalletIcon,
-  CalendarBlankIcon,
   BookOpenIcon,
-  GearSixIcon,
   ArrowRightIcon,
   ListIcon,
   XIcon,
@@ -26,6 +18,7 @@ import { LotusMark } from "./components/LotusMark";
 import { EntryDialog, ApprovalDialog, type EditorState } from "./components/EntryDialog";
 import { LoginDialog } from "./components/LoginDialog";
 import { Dashboard } from "./pages/Dashboard";
+import { SidebarBody, nav, useMediaQuery } from "./components/Sidebar";
 import { RecordsPage } from "./pages/RecordsPage";
 const Chat = lazy(() => import("./components/chat/Chat"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
@@ -53,15 +46,6 @@ function applyTheme(id: ThemeId) {
     /* 没有存储也只是不记住选择 */
   }
 }
-const nav = [
-  { id: "chat", label: "和小莲聊聊", icon: ChatCircleDotsIcon },
-  { id: "today", label: "今日概览", icon: HouseSimpleIcon },
-  { id: "practice", label: "每日功课", icon: FlowerLotusIcon },
-  { id: "journal", label: "我的记录", icon: NotebookIcon },
-  { id: "merit", label: "功过省察", icon: HeartIcon },
-  { id: "ledger", label: "生活账本", icon: WalletIcon },
-  { id: "calendar", label: "我的日历", icon: CalendarBlankIcon },
-];
 const validPages = [...nav.map((n) => n.id), "sources"];
 function currentPage() {
   const hash = location.hash.slice(1);
@@ -83,6 +67,25 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [prompt, setPrompt] = useState("");
   const [theme, setTheme] = useState<ThemeId>(readTheme);
+  // 桌面常驻侧栏：折叠状态记住；手机仍是抽屉
+  const desktop = useMediaQuery("(min-width: 901px)");
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try {
+      return localStorage.getItem("lotus:sidebar") !== "closed";
+    } catch {
+      return true;
+    }
+  });
+  function toggleSidebar() {
+    setSidebarOpen((open) => {
+      try {
+        localStorage.setItem("lotus:sidebar", open ? "closed" : "open");
+      } catch {
+        /* 不记住也只是下次默认展开 */
+      }
+      return !open;
+    });
+  }
   const loadSequence = useRef(0);
   const accountRef = useRef<string | null>(null);
   const [chatProposalIds, setChatProposalIds] = useState<string[]>([]);
@@ -192,10 +195,29 @@ export default function App() {
     navigate("chat");
   }
   const pending = proposals.filter((p) => p.status === "pending");
+  const sidebarProps = {
+    page,
+    session,
+    entries,
+    navigate,
+    onPick: (entry: Entry) => {
+      setMobileOpen(false);
+      edit(entry);
+    },
+    onAccount: () => {
+      setMobileOpen(false);
+      if (session?.mode !== "local" && !session?.authenticated) setLogin(true);
+      else setSettings(true);
+    },
+    onSettings: () => {
+      setMobileOpen(false);
+      setSettings(true);
+    },
+  };
   const canWrite = session?.capabilities.write || false;
   return (
-    <Navigation.Root open={mobileOpen} onOpenChange={setMobileOpen}>
-      <div className={`app-shell ${page === "chat" ? "is-chat-page" : ""}`}>
+    <Navigation.Root open={mobileOpen && !desktop} onOpenChange={setMobileOpen}>
+      <div className={`app-shell ${page === "chat" ? "is-chat-page" : ""} ${desktop && sidebarOpen ? "has-sidebar" : ""}`}>
         <a
           className="skip-link"
           href="#main-content"
@@ -206,109 +228,44 @@ export default function App() {
         >
           跳到主要内容
         </a>
-        <Navigation.Portal>
-          <Navigation.Overlay className="navigation-overlay" />
-          <Navigation.Content className="sidebar navigation-drawer" aria-describedby={undefined}>
-            <Navigation.Title className="sr-only">我的空间</Navigation.Title>
-            <Navigation.Close className="icon-link navigation-close" aria-label="关闭我的空间">
-              <XIcon size={20} />
-            </Navigation.Close>
-            <a className="brand" href="#chat" onClick={() => navigate("chat")}>
-              <span className="brand-mark">
-                <LotusMark size={39} />
-              </span>
-              <div>
-                <strong>
-                  小莲 <span>Lotus</span>
-                </strong>
-                <small>净土伴修，日常相伴</small>
-              </div>
-            </a>
-            <nav aria-label="对话与记录">
-              {nav.map((item, i) => (
-                <div key={item.id}>
-                  {i === 1 && <div className="nav-caption">对话里的日常</div>}
-                  <a
-                    href={`#${item.id}`}
-                    onClick={() => navigate(item.id)}
-                    className={`nav-item ${page === item.id ? "active" : ""}`}
-                    aria-current={page === item.id ? "page" : undefined}
-                  >
-                    <item.icon size={20} weight={page === item.id ? "duotone" : "regular"} />
-                    <span>{item.label}</span>
-                    {page === item.id && <i />}
-                  </a>
-                </div>
-              ))}
-            </nav>
-            <div className="sidebar-bottom">
-              <button
-                className={`nav-item ${page === "sources" ? "active" : ""}`}
-                onClick={() => navigate("sources")}
-              >
-                <BookOpenIcon size={19} />
-                <span>法义文库</span>
-                <ArrowRightIcon size={15} />
-              </button>
-              <div className="sidebar-message">
-                <LotusMark size={26} />
-                <p>
-                  不求一时圆满，
-                  <br />
-                  只愿日日相伴。
-                </p>
-              </div>
-              <div className="account-row">
-                <button
-                  className="account-button"
-                  onClick={() => {
-                    setMobileOpen(false);
-                    if (session?.mode !== "local" && !session?.authenticated) setLogin(true);
-                    else setSettings(true);
-                  }}
-                >
-                  <span className="account-avatar">
-                    {session?.mode === "local" ? "莲" : session?.user?.name?.slice(0, 1) || "莲"}
-                  </span>
-                  <span>
-                    <strong>
-                      {session?.mode === "local" ? "本地体验" : session?.user?.name || "与你相遇"}
-                    </strong>
-                    <small>
-                      {session?.mode === "local"
-                        ? "记录保存在本机"
-                        : session?.authenticated
-                          ? "我的佛悦账号"
-                          : "登录，安放你的日常"}
-                    </small>
-                  </span>
-                </button>
-                <button
-                  className="icon-link"
-                  aria-label="设置"
-                  onClick={() => {
-                    setMobileOpen(false);
-                    setSettings(true);
-                  }}
-                >
-                  <GearSixIcon size={19} />
-                </button>
-              </div>
-            </div>
-          </Navigation.Content>
-        </Navigation.Portal>
+        {desktop && sidebarOpen && (
+          <aside className="sidebar sidebar-static" aria-label="我的空间">
+            <SidebarBody {...sidebarProps} />
+          </aside>
+        )}
+        {!desktop && (
+          <Navigation.Portal>
+            <Navigation.Overlay className="navigation-overlay" />
+            <Navigation.Content className="sidebar navigation-drawer" aria-describedby={undefined}>
+              <Navigation.Title className="sr-only">我的空间</Navigation.Title>
+              <Navigation.Close className="icon-link navigation-close" aria-label="关闭我的空间">
+                <XIcon size={20} />
+              </Navigation.Close>
+              <SidebarBody {...sidebarProps} />
+            </Navigation.Content>
+          </Navigation.Portal>
+        )}
         <div className="main-shell">
           <header className="topbar">
             <div>
-              <Navigation.Trigger asChild>
+              {desktop ? (
                 <button
+                  type="button"
                   className="workspace-menu icon-link"
-                  aria-label="打开我的空间"
+                  aria-label={sidebarOpen ? "收起我的空间" : "展开我的空间"}
+                  aria-expanded={sidebarOpen}
                   title="记录与设置"
+                  onClick={toggleSidebar}
                 >
                   <ListIcon size={23} />
                 </button>
-              </Navigation.Trigger>
+              ) : (
+                <Navigation.Trigger asChild>
+                  <button className="workspace-menu icon-link" aria-label="打开我的空间" title="记录与设置">
+                    <ListIcon size={23} />
+                  </button>
+                </Navigation.Trigger>
+              )}
               <a
                 className="breadcrumb chat-brand-link"
                 href="#chat"

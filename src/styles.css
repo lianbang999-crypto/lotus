@@ -3675,3 +3675,124 @@ button svg {
   .voice-status i { animation: none; }
   .composer-voice.is-recording { transform: none; }
 }
+
+/* ===== 桌面常驻侧栏 + 记录时间线（套 prompt-kit full-chat-app 的骨架）===== */
+.sidebar-static {
+  position: fixed;
+  inset: 0 auto 0 0;
+}
+.app-shell.has-sidebar .main-shell {
+  margin-left: 245px;
+  width: calc(100% - 245px);
+}
+/* 侧栏展开时聊天页顶栏不再重复显示品牌，只留折叠键与页面标签 */
+.app-shell.has-sidebar.is-chat-page .chat-brand-link {
+  display: none;
+}
+.app-shell.has-sidebar.is-chat-page .chat-top-label {
+  border-left: 0;
+  padding-left: 0;
+}
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -6px;
+  padding: 0 6px;
+  scrollbar-width: thin;
+}
+.records-timeline {
+  margin-top: 6px;
+  padding-bottom: 12px;
+}
+.records-timeline .nav-caption {
+  margin: 20px 15px 6px;
+}
+.timeline-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 15px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-align: left;
+  transition: background 0.18s;
+}
+.timeline-item:hover {
+  background: var(--surface-2);
+}
+.timeline-item svg {
+  color: var(--ink-faint);
+  flex: none;
+}
+.timeline-item span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timeline-item small {
+  color: var(--ink-faint);
+  font-size: 10px;
+  flex: none;
+}
+.timeline-more {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--brand);
+  padding: 8px 15px;
+}
+.timeline-empty {
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--ink-faint);
+  padding: 6px 15px;
+}
+@media (max-width: 900px) {
+  .sidebar-static {
+    display: none;
+  }
+  .app-shell.has-sidebar .main-shell {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+/* 桌面常驻侧栏更紧凑：让时间线在 800px 高的屏幕上也露得出来；手机抽屉保持原来的松弛 */
+.sidebar-static {
+  padding-top: 22px;
+}
+.sidebar-static .brand {
+  margin-bottom: 20px;
+}
+.sidebar-static .nav-item {
+  padding: 8px 13px;
+  margin-bottom: 2px;
+  font-size: 12.5px;
+}
+.sidebar-static nav > div:first-child .nav-item {
+  min-height: 40px;
+}
+.sidebar-static .nav-caption {
+  margin: 16px 13px 6px;
+}
+.sidebar-static .records-timeline .nav-caption {
+  margin-top: 14px;
+}
+.sidebar-static .sidebar-message {
+  display: none;
+}
+.sidebar-static .sidebar-bottom {
+  padding-top: 10px;
+}
+.sidebar-static .account-row {
+  padding: 12px 0;
+}
+.sidebar-static .sidebar-scroll {
+  mask-image: linear-gradient(to bottom, black calc(100% - 22px), transparent);
+}

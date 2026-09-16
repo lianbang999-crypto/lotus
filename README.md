@@ -27,7 +27,7 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 
 ## 首版能力
 
-- **聊天是默认主界面**：欢迎页、自然语言起手句、固定输入框、消息流、原生工具确认卡。功课、笔记、日记、功过省察、账本、日历收进「我的空间」抽屉。消息带北京时间戳与按天分隔；输入草稿跨刷新保留（sessionStorage，关浏览器即清）；对话区可「开始新的对话」。
+- **聊天是默认主界面**：欢迎页、自然语言起手句、固定输入框、消息流、原生工具确认卡。功课、笔记、日记、功过省察、账本、日历收进「我的空间」侧栏：桌面常驻可折叠（记住状态），手机为抽屉；侧栏下半是按今天 / 昨天 / 最近 7 天 / 更早分组的记录时间线，点一条直接编辑。消息带北京时间戳与按天分隔；输入草稿跨刷新保留（sessionStorage，关浏览器即清）；对话区可「开始新的对话」。
 - 输入框旁「＋」可手动填写，确认卡回到对话流中；未配置模型也能核对、确认、取消。切换记录页面保留尚未发送的聊天草稿，未确认提案可在刷新后恢复。
 - 新增/修改/删除均先生成不可变提案，确认后才写入；取消不改变业务记录，重复确认不重复写入。
 - 修改/删除带版本校验；金额按人民币整数分保存。日历为北京时间，提供应用内时间提示与完成状态，暂不发送系统推送。
@@ -56,7 +56,7 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 | 热力图 | [cal-heatmap](https://cal-heatmap.com/) | 4.2.4 · MIT | 功课与省察足迹（抽屉内，懒加载） |
 | 语音转写 | Workers AI `@cf/openai/whisper-large-v3-turbo` + R2 | 平台服务 · $0.000513/分钟 | 语音条转写与原音回放；`wrangler.jsonc` 的 `ai` / `r2_buckets` 绑定，本地开发 AI 走 `remote: true` |
 
-**只是设计参考、未引入代码**：Zola（布局）、prompt-kit（视觉细节）、Haven（陪伴感）、以及 AIRI / KouriChat / Everthine / SillyTavern / EverOtome 等陪伴类项目的交互取舍，分别见 [设计调研](docs/design-references.md) 与 [陪伴类项目调研](docs/companion-references.md)。
+**只是设计参考、未引入代码**：Zola（布局）、prompt-kit（`full-chat-app` 区块的侧栏 + 消息流 + 输入框动作行骨架，2026-09-16 起按此结构自建）、Haven（陪伴感）、以及 AIRI / KouriChat / Everthine / SillyTavern / EverOtome 等陪伴类项目的交互取舍，分别见 [设计调研](docs/design-references.md) 与 [陪伴类项目调研](docs/companion-references.md)。
 
 **关于 shadcn/ui**：`components.json` 存在（new-york / stone），但仓库里**没有安装 shadcn 组件**——`src/components/ui/` 下的 `button.tsx`、`dialog.tsx` 是按 shadcn 约定手写的薄封装（合计 10 行），直接包 Radix，样式走 `styles.css` 的语义类（`button-primary` 等）而非 Tailwind 工具类串。这是刻意选择：小莲的视觉是 3300 行手写 CSS，若引入 shadcn 组件自带的 Tailwind 工具类，等于在同一个项目里并行维护两套样式体系。保留 `components.json` 是为了以后 `npx shadcn add` 能落到正确目录。
 

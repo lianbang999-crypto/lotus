@@ -134,3 +134,16 @@ WRANGLER_LOG_PATH=/tmp/lotus-chat-ui-wrangler.log npx vite --config tests/backen
 **浏览器证据**：三套主题各在 1280×800 与 390×844 截图（`output/playwright/theme/v2-* v3-*`），苔绿与改前（`before-*`）逐张比对无可见差异；朝霞、素纸下语音气泡、输入框、确认按钮、抽屉、设置弹窗全部可读。素纸切换后 `body` 字体实测为 `"Songti SC", "Noto Serif SC", …`。通过设置弹窗点「素纸」→ `data-theme`、`localStorage`、字体三者同步；刷新后保持。`tsc` / `oxlint` / 110 项单测 / 生产构建通过（CSS 82.5 kB，gzip 16.3 kB，与改前持平）。
 
 **未做**：深色模式（预设自带深色值，token 结构已就绪，但苔绿没有现成深色版需要设计，且验证矩阵翻倍，本轮不做）；预设指定的 Montserrat / Libre Baskerville 是 Google 字体，大陆加载不可靠，**未引入 webfont**，素纸用系统宋体栈。
+
+## 2026-09-16 聊天布局（阶段 2 · 下半）：桌面常驻侧栏 + 记录时间线
+
+套的是 prompt-kit `full-chat-app` 区块的骨架（侧栏 + 消息流 + 输入框动作行），**没有安装 shadcn `Sidebar` 或 prompt-kit 组件**——它们的样式是 Tailwind 工具类串，与本项目 3700 行手写 CSS 是两套体系（理由见 README「关于 shadcn/ui」）。做法是把侧栏主体抽成 `src/components/Sidebar.tsx` 的 `SidebarBody`，桌面（≥ 901px）渲染成常驻 `<aside>`，手机沿用 Radix 抽屉，两处共用；`useMediaQuery` 决定挂哪一个，顶栏那颗 ☰ 在桌面是折叠 / 展开（`localStorage["lotus:sidebar"]` 记住），在手机是开抽屉。侧栏展开时聊天页顶栏不再重复显示品牌。
+
+区块里「历史列表」的位置放的是**用户自己的记录**（`RecordsTimeline`）：按今天 / 昨天 / 最近 7 天 / 更早分组，最多 18 条，点一条直接进「编辑记录」弹窗，底部「查看全部记录」进我的记录页。数据就是已有的 `entries`，不需要多会话后端。首页插画与 logo（`LotusMark.tsx`）的 10 处 SVG 内联色改为 token，跟主题走。
+
+浏览器证据（本地 dev，1280×800 / 1280×720 / 390×844）：
+
+- 用真实提案流程造了 4 条记录（今天功课、昨天日记、5 天前账目、20 天前笔记），侧栏正确分到四组；桌面点「供灯」打开编辑弹窗；手机抽屉里点「念佛 500 声」抽屉关闭、编辑弹窗打开。
+- 桌面展开：侧栏 245px，聊天列在剩余宽度内重新居中，顶栏只剩 ☰ 与「净土伴修」；折叠后满宽、品牌回到顶栏；刷新后折叠状态保持。三套主题下侧栏与时间线均正常。
+- **一次返工**：第一版沿用抽屉的行距，800px 高的屏幕上时间线只露出半行。只对 `.sidebar-static` 收紧（导航行 8px 内边距、隐藏那句诗、缩小上下留白）并给滚动区底部加渐隐提示后，四个分组标题在 800px 下全部可见（412–613px）。手机抽屉保持原来的松弛版式。
+- `tsc` / `oxlint` / 110 项单测 / 生产构建 / `wrangler deploy --dry-run` 通过。这 4 条示例记录留在本地 dev 数据里，不影响线上。
