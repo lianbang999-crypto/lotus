@@ -122,3 +122,15 @@ WRANGLER_LOG_PATH=/tmp/lotus-chat-ui-wrangler.log npx vite --config tests/backen
 测试环境的坑（记下来防止以后再踩）：**macOS 上 Chromium 的音频服务是沙箱化独立进程，读不到 `--use-file-for-fake-audio-capture` 的文件**，录到的是纯静音（RMS 0），换 16 k / 48 k 采样率都没用；加 `--disable-features=AudioServiceOutOfProcess,AudioServiceSandbox` 后才有声。另外每条 `playwright-cli` 命令有约 2 s 启动开销，"按住 2 秒"实际录到约 5 秒，不是时长 bug。
 
 未做 / 未验：真机 iPhone 微信内置浏览器与安卓 Chrome 尚未手测（`MediaRecorder` 在 iOS 出 mp4/aac，已按重采样路径设计但未在真机跑过）；线上延迟未量。
+
+## 2026-09-16 三套主题（阶段 2 · 上半）：苔绿 / 朝霞 / 素纸
+
+**做法**：`styles.css` 原有 415 处硬编码色值（339 个不同 hex）用脚本按 OKLCH 明度与属性上下文归并为 17 个语义 token（`white / bg / surface / surface-2 / muted / border / border-strong / ink-faint / ink-muted / ink-soft / brand / brand-strong / ink / ink-strong / brand-fg / danger / danger-soft`），带透明度的 8 位 hex 转成 `color-mix(in srgb, var(--token) N%, transparent)`。`:root` 定义苔绿（每个桶取明度中位数那个真实存在的色），`[data-theme="dawn"]` / `[data-theme="paper"]` 由 tweakcn 的 *Sunset Horizon* / *Vintage Paper* 预设推导（预设没有的中间档在线性 sRGB 里小幅混色）。shadcn / Streamdown 认的 `--background / --primary / --muted …` 作为别名指向 token，`@theme inline` 让 Tailwind 工具类跟着走。切换入口在「我的小莲」设置弹窗，`localStorage["lotus:theme"]`，`index.html` 首屏前内联脚本设 `data-theme`，刷新不闪。
+
+**归并规则翻过一次车，记下来**：第一版只按明度分桶，把正文深绿（L≈0.45）和品牌绿归成同一个 `brand`。苔绿下看不出来，切到朝霞整段正文变珊瑚色。修正：`color` 属性落在该明度段的默认归 `ink-soft`（正文柔色），只有选择器明显是链接 / 按钮 / 标签 / 导航 / 图标（`ACCENT` 正则）才保留 `brand`。脚本会打印两类选择器清单供核对，本轮核对结果：`ink-soft` 26 个选择器全是正文、标题、表单；`brand` 19 个全是可点元素。
+
+**对比度**（WCAG，文字压在页面底上）：苔绿沿用原值；素纸 `brand` 3.67:1、`ink-muted` 4.53:1；朝霞把珊瑚 `#ff7e5f` 往前景掺 30% 得 `#ee765a`→ `brand` 3.14:1、白字压按钮 3.28:1——只达到大字标准（3:1），够不上正文的 4.5:1。朝霞是"活泼"主题，正文已全部走 `ink-soft`（11.5:1），珊瑚只用在标题、徽标、按钮、播放键这些大块或粗体元素上，这是有意的取舍，记录在此。
+
+**浏览器证据**：三套主题各在 1280×800 与 390×844 截图（`output/playwright/theme/v2-* v3-*`），苔绿与改前（`before-*`）逐张比对无可见差异；朝霞、素纸下语音气泡、输入框、确认按钮、抽屉、设置弹窗全部可读。素纸切换后 `body` 字体实测为 `"Songti SC", "Noto Serif SC", …`。通过设置弹窗点「素纸」→ `data-theme`、`localStorage`、字体三者同步；刷新后保持。`tsc` / `oxlint` / 110 项单测 / 生产构建通过（CSS 82.5 kB，gzip 16.3 kB，与改前持平）。
+
+**未做**：深色模式（预设自带深色值，token 结构已就绪，但苔绿没有现成深色版需要设计，且验证矩阵翻倍，本轮不做）；预设指定的 Montserrat / Libre Baskerville 是 Google 字体，大陆加载不可靠，**未引入 webfont**，素纸用系统宋体栈。

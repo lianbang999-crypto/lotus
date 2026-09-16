@@ -29,6 +29,30 @@ import { Dashboard } from "./pages/Dashboard";
 import { RecordsPage } from "./pages/RecordsPage";
 const Chat = lazy(() => import("./components/chat/Chat"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
+/** 三套主题：苔绿是小莲本色；朝霞、素纸分别套 tweakcn 的 Sunset Horizon / Vintage Paper 预设。 */
+const themes = [
+  { id: "lotus", label: "苔绿", hint: "小莲的本色" },
+  { id: "dawn", label: "朝霞", hint: "活泼一些" },
+  { id: "paper", label: "素纸", hint: "极简克制" },
+] as const;
+type ThemeId = (typeof themes)[number]["id"];
+function readTheme(): ThemeId {
+  try {
+    const stored = localStorage.getItem("lotus:theme");
+    return themes.some((t) => t.id === stored) ? (stored as ThemeId) : "lotus";
+  } catch {
+    return "lotus";
+  }
+}
+// index.html 里的内联脚本在首屏前已经设过一次，这里只在用户切换时更新并记住。
+function applyTheme(id: ThemeId) {
+  document.documentElement.dataset.theme = id;
+  try {
+    localStorage.setItem("lotus:theme", id);
+  } catch {
+    /* 没有存储也只是不记住选择 */
+  }
+}
 const nav = [
   { id: "chat", label: "和小莲聊聊", icon: ChatCircleDotsIcon },
   { id: "today", label: "今日概览", icon: HouseSimpleIcon },
@@ -58,6 +82,7 @@ export default function App() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [theme, setTheme] = useState<ThemeId>(readTheme);
   const loadSequence = useRef(0);
   const accountRef = useRef<string | null>(null);
   const [chatProposalIds, setChatProposalIds] = useState<string[]>([]);
@@ -490,6 +515,30 @@ export default function App() {
             <div>
               <dt>日程提醒</dt>
               <dd>应用内查看</dd>
+            </div>
+            <div>
+              <dt>主题</dt>
+              <dd>
+                <div className="theme-picker" role="radiogroup" aria-label="主题">
+                  {themes.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={theme === t.id}
+                      className={`theme-swatch theme-swatch-${t.id} ${theme === t.id ? "is-active" : ""}`}
+                      onClick={() => {
+                        applyTheme(t.id);
+                        setTheme(t.id);
+                      }}
+                    >
+                      <i aria-hidden="true" />
+                      <span>{t.label}</span>
+                      <small>{t.hint}</small>
+                    </button>
+                  ))}
+                </div>
+              </dd>
             </div>
           </dl>
           <p className="field-hint">
