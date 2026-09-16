@@ -32,7 +32,7 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 - 新增/修改/删除均先生成不可变提案，确认后才写入；取消不改变业务记录，重复确认不重复写入。
 - 修改/删除带版本校验；金额按人民币整数分保存。日历为北京时间，提供应用内时间提示与完成状态，暂不发送系统推送。
 - `AIChatAgent` 流式会话、消息持久化、语义工具、原生审批卡片；服务器额外核对提案内容、确认帧和幂等执行记录。
-- SDK 版本固定 `@cloudflare/ai-chat@0.9.3`：实测 0.9.4 调用 Agents 0.17.4 不存在的 `_withAgentSpan`，导致 DO 无法启动。另固定 `ai@6.0.202` 与 `@ai-sdk/react@3.0.204` 以保持原生工具续答兼容。请保留 lockfile，升级时运行客户端解析器和真实 Worker 浏览器流程。
+- SDK 版本：`agents@^0.23`、`@cloudflare/ai-chat@^0.12`（2026-09-16 升级，为实时语音通话所需）；`ai@6.0.202` 与 `@ai-sdk/react@3.0.204` 仍固定以保持原生工具续答兼容。升级时注意 `agents` 把 `@modelcontextprotocol/sdk` 钉在精确版本，增量 `npm install` 会 ERESOLVE，需先卸掉旧 `agents` 子树再一起装。请保留 lockfile，升级后跑真实 Worker 浏览器流程（对话、确认卡、语音条）。
 - `searchDharma` 只调用原有 wenchao 检索，严格验证语料角色和来源地址。来源卡将原文与解释区分。
 - 聊天回复的 Markdown 由 Streamdown 渲染，但**不启用 `rehype-raw`**：模型输出的原始 HTML 以纯文本显示而非进入 DOM。这既是安全边界，也让首屏分包省掉 parse5（Chat 分包 909→739 kB，gzip 266→214）。约束由 `src/lib/rehype-raw-stub.ts`、`vite.config.ts` 的 alias 与 `tests/backend/markdown-safety.test.ts` 三处共同保证，改动前请先看该测试的注释。
 - **三套主题**（2026-09-16）：苔绿（小莲本色）、朝霞（活泼）、素纸（极简、宋体）。设置弹窗里切换，记在 `localStorage`，首屏前内联脚本设 `data-theme` 不闪屏。改色只改 `styles.css` 顶部的 token 块。
@@ -45,7 +45,7 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 | 层 | 用的项目 | 版本 / 许可证 | 在小莲里负责什么 |
 | --- | --- | --- | --- |
 | 对话运行时 | [assistant-ui](https://github.com/assistant-ui/assistant-ui) | 0.15.19 · MIT | `Thread/Composer` 原语：视口自动滚动、「回到最新」、输入框状态与 IME 合成、Enter/Shift+Enter |
-| Agent 通道 | `agents` + `@cloudflare/ai-chat` | 0.17.4 / 0.9.3 · MIT | WebSocket 会话、消息持久化、原生工具审批帧、`clearHistory` |
+| Agent 通道 | `agents` + `@cloudflare/ai-chat` | 0.23.0 / 0.12.0 · MIT | WebSocket 会话、消息持久化、原生工具审批帧、`clearHistory` |
 | 无障碍交互 | [Radix UI](https://www.radix-ui.com/) | dialog 1.1.23 / slot 1.3.3 · MIT | 「我的空间」抽屉与各弹窗：焦点陷阱、Esc 关闭、焦点归位 |
 | Markdown 渲染 | [Streamdown](https://github.com/vercel/streamdown) | 2.6.0 · Apache-2.0 | 流式 Markdown、未闭合语法容错、流式光标；**已禁用 `rehype-raw`** |
 | 图标 | [Phosphor Icons](https://phosphoricons.com/) | 2.1.10 · MIT | 全站图标（regular/duotone/light 三种字重） |
@@ -66,7 +66,7 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 
 ## 正式服务接线
 
-账号服务固定 `https://auth.foyue.org`。Lotus 服务器验证其 `/api/accounts/me` 返回的 `accountId`，不会让浏览器指定 Durable Object。所有修改和 WebSocket 握手都核对同源 Origin；已连接 WebSocket 的每次消息也重新验证会话，认证凭据只保留于内存；活跃连接已关闭休眠，防止上下文丢失，断开时提供重新连接入口。原 auth `/login` 不支持返回地址，因此 Lotus 提供自身的邮箱与 Google 登录入口。只有正式账号能保存长期数据，匿名升级迁移尚未实现。
+账号服务固定 `https://auth.foyue.org`。Lotus 服务器验证其 `/api/accounts/me` 返回的 `accountId`，不会让浏览器指定 Durable Object。所有修改和 WebSocket 握手都核对同源 Origin；WebSocket 在握手时验证一次会话，只把 `accountId` 写进休眠安全的连接状态（不保存任何可重放凭据），之后每帧只读状态；文本帧超过 30 分钟由服务端以 4409 关闭、客户端静默重连重新握手，登录被吊销的窗口以此为限；语音的二进制帧同样受连接状态门禁但不触发重验。原 auth `/login` 不支持返回地址，因此 Lotus 提供自身的邮箱与 Google 登录入口。只有正式账号能保存长期数据，匿名升级迁移尚未实现。
 
 在 `.foyue.org` 子域部署后，已有共享 Cookie 才能完成真实 SSO。本机开发模式不宣称完成生产 SSO。详见 [账号接入](docs/auth-integration.md)。
 

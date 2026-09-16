@@ -983,9 +983,10 @@ function ConnectedChat(props: ChatProps) {
       setOnline(true);
       setDisconnected(false);
     },
-    onClose: () => {
+    onClose: (event) => {
       setOnline(false);
-      setDisconnected(true);
+      // 4409 是服务端要求重新验证：PartySocket 会自动重连并在握手时重新核对登录，不当成"断开"展示。
+      setDisconnected(event.code !== 4409);
     },
   });
   const {

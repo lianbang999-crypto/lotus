@@ -137,26 +137,30 @@ function errorResponse(error: unknown) {
   return json({ error: "SERVICE_UNAVAILABLE", message: "服务暂时不可用，请稍后重试" }, 503);
 }
 
+/** 连接级鉴权状态：握手时验一次，写进休眠安全的 connection.state；里面只有账号 id，没有任何可重放的凭据。 */
+type ConnectionAuth = { accountId: string; verifiedAt: number };
+/** 文本帧超过这个时长就要求客户端重新握手（专用关闭码，客户端静默重连），把登录被吊销的窗口限制在这一段内。 */
+const CONNECTION_TTL_MS = 30 * 60 * 1000;
+export const RECONNECT_CODE = 4409;
+
 export class LotusAgent extends AIChatAgent<LotusEnv> {
-  // Per-frame authentication keeps credentials in memory. Hibernation would
-  // discard that context while retaining sockets, so active sockets stay awake.
-  static options = { hibernate: false, sendIdentityOnConnect: false };
+  // agents 0.22 起休眠是强制的，凭据不能留在内存里；改为 onConnect 验一次、状态存附件。
+  static options = { sendIdentityOnConnect: false };
   constructor(ctx: AgentContext, env: LotusEnv) {
     super(ctx, env);
     // Wrap AFTER the SDK constructor so forged incoming transcripts cannot bypass
     // the application approval ledger. Only a dedicated approval frame can decide.
     const sdkOnMessage = this.onMessage.bind(this);
     this.onMessage = async (connection, message) => {
-      try {
-        const authRequest = this.connectionAuth.get(connection.id);
-        if (!authRequest) { connection.close(4401, "请重新连接以验证登录状态"); return; }
-        const session = await resolveSession(authRequest, this.env, import.meta.env.DEV);
-        if (!session || session.isAnonymous) { connection.close(4401, "登录状态已失效，请重新登录"); return; }
-        this.lotusStore.assertOwner(session.accountId);
-      } catch {
-        connection.close(4401, "无法验证登录状态，请重新连接");
+      // 每帧只读连接状态（休眠后由附件恢复），不再逐帧去账号服务；语音的二进制帧也过这一关，但不触发重验。
+      const auth = (connection as Connection<ConnectionAuth>).state;
+      if (!auth?.accountId) { connection.close(4401, "请重新连接以验证登录状态"); return; }
+      if (typeof message === "string" && Date.now() - auth.verifiedAt > CONNECTION_TTL_MS) {
+        connection.close(RECONNECT_CODE, "会话需要重新验证，请重新连接");
         return;
       }
+      try { this.lotusStore.assertOwner(auth.accountId); }
+      catch { connection.close(4401, "此资料不属于当前账号"); return; }
       let event;
       try { event = typeof message === "string" ? parseProtocolMessage(message) : null; }
       catch { connection.close(1008, "消息格式无效"); return; }
@@ -172,20 +176,23 @@ export class LotusAgent extends AIChatAgent<LotusEnv> {
       return sdkOnMessage(connection, message);
     };
   }
-  // Session credentials stay in memory only. Hibernation requires a new verified
-  // handshake rather than persisting reusable credentials in SQLite/attachments.
-  private connectionAuth = new Map<string, Request>();
+  /** 握手时验证一次账号服务，把 accountId 写进连接状态；验不过就直接关闭，不让未验证的连接活着。 */
   async onConnect(connection: Connection, context: ConnectionContext) {
     const headers = new Headers();
     for (const name of ["Cookie", "Authorization"]) {
       const value = context.request.headers.get(name);
       if (value) headers.set(name, value);
     }
-    this.connectionAuth.set(connection.id, new Request(context.request.url, { headers }));
+    let session: Awaited<ReturnType<typeof resolveSession>> = null;
+    try { session = await resolveSession(new Request(context.request.url, { headers }), this.env, import.meta.env.DEV); }
+    catch { connection.close(4401, "无法验证登录状态，请重新连接"); return; }
+    if (!session || session.isAnonymous) { connection.close(4401, "登录状态已失效，请重新登录"); return; }
+    try { this.lotusStore.assertOwner(session.accountId); }
+    catch { connection.close(4401, "此资料不属于当前账号"); return; }
+    (connection as Connection<ConnectionAuth>).setState({ accountId: session.accountId, verifiedAt: Date.now() });
+    return super.onConnect(connection, context);
   }
-  async onClose(connection: Connection) { this.connectionAuth.delete(connection.id); }
   maxPersistedMessages = 100;
-  chatRecovery = true;
   private _lotusStore?: LotusStore;
   private get lotusStore() {
     this._lotusStore ??= new LotusStore({

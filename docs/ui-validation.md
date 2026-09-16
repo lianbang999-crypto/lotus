@@ -147,3 +147,21 @@ WRANGLER_LOG_PATH=/tmp/lotus-chat-ui-wrangler.log npx vite --config tests/backen
 - 桌面展开：侧栏 245px，聊天列在剩余宽度内重新居中，顶栏只剩 ☰ 与「净土伴修」；折叠后满宽、品牌回到顶栏；刷新后折叠状态保持。三套主题下侧栏与时间线均正常。
 - **一次返工**：第一版沿用抽屉的行距，800px 高的屏幕上时间线只露出半行。只对 `.sidebar-static` 收紧（导航行 8px 内边距、隐藏那句诗、缩小上下留白）并给滚动区底部加渐隐提示后，四个分组标题在 800px 下全部可见（412–613px）。手机抽屉保持原来的松弛版式。
 - `tsc` / `oxlint` / 110 项单测 / 生产构建 / `wrangler deploy --dry-run` 通过。这 4 条示例记录留在本地 dev 数据里，不影响线上。
+
+## 2026-09-16 依赖升级 + 连接鉴权重构（阶段 3）
+
+**升级**：`agents` 0.17.4 → 0.23.0，`@cloudflare/ai-chat` 0.9.3 → 0.12.0；`ai` 6.0.202 与 `@ai-sdk/react` 3.0.204 不动（ai-chat 0.12 的 peer 允许 `ai ^6||^7`，语音混入不依赖 `ai`）。lockfile 只动 225/387 行，没有全量漂移。**安装的坑**：`agents@0.23` 把 `@modelcontextprotocol/sdk` 钉在精确 1.30.0、还有 `@cloudflare/codemode ≥0.5` 的可选 peer，而旧 `agents` 子树带着 1.29.0 / 0.4.4，增量 `npm install` 无论先装哪个都 ERESOLVE，每次只暴露一层；不清 lockfile（`package.json` 里十来个 `latest` 会全漂）的做法是先 `npm uninstall @cloudflare/ai-chat agents` 卸掉整棵旧子树，再把两个新包一起装。`npm warn EBADENGINE`：本机 Node 22.14 低于 `@babel/code-frame@8` 要求的 22.18，仅告警。
+
+**为什么必须重构鉴权**：0.22 起 `static options.hibernate` 被删、休眠强制，原来 `onConnect` 把凭据塞进内存 Map、`onMessage` 逐帧拿它去 `auth.foyue.org` 验证的做法在升级后第一条消息就被 4401 关掉（浏览器实测「连接已断开」）。而且逐帧 HTTP 对即将到来的语音二进制帧是灾难。
+
+**新模型**（`src/server.ts`）：`onConnect` 验一次 `resolveSession`，通过后 `connection.setState({ accountId, verifiedAt })`（partyserver 的休眠安全附件；**只有账号 id，没有任何可重放凭据**），验不过直接 `close(4401)`；`onMessage` 每帧只读 `connection.state`，缺失即 4401，`assertOwner` 与原生工具审批账本不变；文本帧超过 30 分钟以 **4409** 关闭要求重新握手，客户端 `onClose` 遇 4409 不显示"断开"、由 PartySocket 自动重连并重新验证；语音等二进制帧过状态门禁但不触发 TTL。`chatRecovery = true` 那行删掉走默认（0.11 起每轮都在恢复纤程里）。
+
+**验证**：
+
+- **聊天历史一次性迁移**：本地 DO 里有升级前的真实历史（两轮文字 + 一条语音条），升级后首次打开全部保留、可回放。这是计划里最担心的一步，本地过了；线上仍是不可回滚，部署前再确认。
+- 升级后对话：发一句话 4 秒收到回复，无断开、dev 日志无异常。
+- **工具确认流程**（经过 `onMessage` 包装层的审批账本）：让小莲记「晚课念佛 108 声」→ 确认卡 4 秒出现 → 确认前记录仍 4 条 → 点「确认保存」→ 5 条且 `('晚课念佛', 108)` → 小莲续答「已记下」。
+- 语音条：`tests/browser/voice-flow.sh` 重跑，语音条 2 → 3，最后一条时长 0:04、转写「今天念佛五百**生**,心里很平静。」（这次 Whisper 把"声"写成同音"生"，前一次是对的——转写有随机性，同音字错误存在）、回放正常。脚本本身修过一次：原先抓页面第一个段落/第一个气泡，会拿旧记录冒充新结果，改为按数量 +1 判定、只看最后一条。
+- 单测：`server.test.ts` 三个连接测试改写为「握手验一次且附件里不含凭据 / 三种非法会话握手即关且之后任何帧不达 SDK / TTL 后文本帧 4409、二进制帧放行」；110 项全过。`tsc` / `oxlint` / 生产构建 / `wrangler deploy --dry-run` 通过（上传 2599 → 3142 KiB，`agents` 0.23 更大）。
+
+**未验**：4409 重连路径没有在浏览器里等 30 分钟实测，只有单测覆盖服务端与一行客户端逻辑；线上迁移未做。

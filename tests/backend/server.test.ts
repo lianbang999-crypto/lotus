@@ -13,9 +13,11 @@ vi.mock("@cloudflare/ai-chat", () => ({AIChatAgent: class {
   ctx: unknown;
   onMessage = gateway.sdkOnMessage;
   constructor(ctx: unknown, env: unknown) { this.ctx = ctx; this.env = env; }
+  // 原型方法而不是实例字段：LotusAgent.onConnect 里 super.onConnect 走的是原型链
+  onConnect() {}
 }}));
 vi.mock("../../src/agent/auth", async (original) => ({ ...await original<typeof import("../../src/agent/auth")>(), resolveSession: gateway.resolveSession }));
-import worker, { LotusAgent } from "../../src/server";
+import worker, { LotusAgent, RECONNECT_CODE } from "../../src/server";
 import { sqliteStore } from "./sqlite";
 const env = { LotusAgent: {}, OPENAI_API_KEY: "fixture-model-key", MODEL_NAME: "test", DEV_LOCAL: "false" } as never;
 const request = (path: string, init?: RequestInit) => new Request(`https://lotus.foyue.org${path}`, init);
@@ -71,45 +73,60 @@ describe("authenticated routing boundary", () => {
 });
 
 
+// agents 0.22 起休眠强制：凭据不能留内存。握手验一次，只把 accountId 写进连接状态；每帧读状态，不再逐帧验证。
 describe("connected socket authorization and native decision boundary", () => {
+  type Auth = {accountId: string; verifiedAt: number} | null;
+  function socket() {
+    const connection = {id: "socket-1", state: null as Auth, close: vi.fn(), send: vi.fn(), setState: vi.fn()};
+    connection.setState.mockImplementation((next: Auth) => { connection.state = next; });
+    return connection as unknown as Parameters<LotusAgent["onConnect"]>[0] & {state: Auth};
+  }
   async function connected() {
     const agent = new LotusAgent({} as never, env);
     const {store, sqlite} = sqliteStore();
     store.assertOwner("trusted-account");
     Object.assign(agent, {_lotusStore: store});
-    const connection = {id: "socket-1", close: vi.fn(), send: vi.fn()} as unknown as Parameters<LotusAgent["onConnect"]>[0];
+    const connection = socket();
     await agent.onConnect(connection, {request: request("/api/agent", {headers: {Cookie: "session=fixture"}})} as never);
     return {agent, connection, store, sqlite};
   }
-  it("revalidates the session before handling an approval and forwards only a first decision", async () => {
+  it("verifies once at handshake, keeps only the account id on the connection, and forwards only a first decision", async () => {
     const {agent, connection, store, sqlite} = await connected();
     try {
+      expect(gateway.resolveSession).toHaveBeenCalledTimes(1);
+      expect(connection.state).toMatchObject({accountId: "trusted-account"});
+      expect(JSON.stringify(connection.state)).not.toContain("fixture"); // 凭据不进附件
       store.registerNativeTool("native-1", {action: "create", entry: {kind: "note", title: "审批", content: "", extra: {}}});
       const frame = JSON.stringify({type: "cf_agent_tool_approval", toolCallId: "native-1", approved: true, autoContinue: true});
       await agent.onMessage(connection, frame);
       await agent.onMessage(connection, frame);
-      expect(gateway.resolveSession).toHaveBeenCalledTimes(2);
-      expect(gateway.sdkOnMessage).toHaveBeenCalledOnce();
+      expect(gateway.resolveSession).toHaveBeenCalledTimes(1); // 不再逐帧去账号服务
+      expect(gateway.sdkOnMessage).toHaveBeenCalledOnce();     // 第二次相同决定被吞掉
       expect(store.list()).toEqual([]);
     } finally { sqlite.close(); }
   });
-  it("blocks a revoked session and a different account before the SDK sees the frame", async () => {
-    const {agent, connection, sqlite} = await connected();
-    try {
-      gateway.resolveSession.mockResolvedValueOnce(null).mockResolvedValueOnce({accountId: "other-account", isAnonymous: false, mode: "cloud"});
-      await agent.onMessage(connection, JSON.stringify({type: "cf_agent_chat_clear"}));
-      await agent.onMessage(connection, JSON.stringify({type: "cf_agent_chat_clear"}));
-      expect(connection.close).toHaveBeenCalledTimes(2);
-      expect(gateway.sdkOnMessage).not.toHaveBeenCalled();
-    } finally { sqlite.close(); }
+  it("closes the handshake for missing, anonymous or foreign sessions, and no frame reaches the SDK afterwards", async () => {
+    const cases = [null, {accountId: "anon", name: "", isAnonymous: true, mode: "cloud"}, {accountId: "other-account", name: "", isAnonymous: false, mode: "cloud"}];
+    for (const session of cases) {
+      gateway.resolveSession.mockResolvedValueOnce(session);
+      const {agent, connection, sqlite} = await connected();
+      try {
+        expect(connection.close).toHaveBeenCalledWith(4401, expect.any(String));
+        expect(connection.state).toBeNull();
+        await agent.onMessage(connection, JSON.stringify({type: "cf_agent_chat_clear"}));
+        expect(gateway.sdkOnMessage).not.toHaveBeenCalled();
+      } finally { sqlite.close(); }
+    }
   });
-  it("requires a new authenticated handshake after memory authentication context is absent", async () => {
+  it("asks for a fresh handshake once the connection is older than the TTL, but lets binary (voice) frames through", async () => {
     const {agent, connection, sqlite} = await connected();
     try {
-      await agent.onClose(connection);
-      await agent.onMessage(connection, JSON.stringify({type: "cf_agent_tool_approval", toolCallId: "old", approved: true}));
-      expect(connection.close).toHaveBeenCalledWith(4401, expect.any(String));
-      expect(gateway.sdkOnMessage).not.toHaveBeenCalled();
+      connection.state = {accountId: "trusted-account", verifiedAt: Date.now() - 31 * 60 * 1000};
+      await agent.onMessage(connection, new ArrayBuffer(8));
+      expect(gateway.sdkOnMessage).toHaveBeenCalledOnce();
+      await agent.onMessage(connection, JSON.stringify({type: "cf_agent_chat_clear"}));
+      expect(connection.close).toHaveBeenCalledWith(RECONNECT_CODE, expect.any(String));
+      expect(gateway.sdkOnMessage).toHaveBeenCalledOnce();
     } finally { sqlite.close(); }
   });
 });
