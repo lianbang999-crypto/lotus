@@ -28,7 +28,7 @@ const unavailable = () => new AuthError("AUTH_UNAVAILABLE", "账号服务暂时�
 export function assertSameOrigin(request: Request): void {
   const origin = request.headers.get("Origin");
   if (!origin || origin !== new URL(request.url).origin) {
-    throw new AuthError("FORBIDDEN_ORIGIN", "请求来源不匹配，请从莲花页面重试", 403);
+    throw new AuthError("FORBIDDEN_ORIGIN", "请求来源不匹配，请从小莲页面重试", 403);
   }
 }
 

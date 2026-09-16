@@ -30,7 +30,7 @@ import { RecordsPage } from "./pages/RecordsPage";
 const Chat = lazy(() => import("./components/chat/Chat"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const nav = [
-  { id: "chat", label: "和莲花聊聊", icon: ChatCircleDotsIcon },
+  { id: "chat", label: "和小莲聊聊", icon: ChatCircleDotsIcon },
   { id: "today", label: "今日概览", icon: HouseSimpleIcon },
   { id: "practice", label: "每日功课", icon: FlowerLotusIcon },
   { id: "journal", label: "我的记录", icon: NotebookIcon },
@@ -194,7 +194,7 @@ export default function App() {
               </span>
               <div>
                 <strong>
-                  莲花 <span>Lotus</span>
+                  小莲 <span>Lotus</span>
                 </strong>
                 <small>净土伴修，日常相伴</small>
               </div>
@@ -288,11 +288,11 @@ export default function App() {
                 className="breadcrumb chat-brand-link"
                 href="#chat"
                 onClick={() => navigate("chat")}
-                aria-label="回到莲花对话"
+                aria-label="回到小莲对话"
               >
                 <LotusMark size={25} />
                 <span>
-                  莲花 <span className="brand-english">Lotus</span>
+                  小莲 <span className="brand-english">Lotus</span>
                 </span>
               </a>
               {page !== "chat" && (
@@ -344,7 +344,7 @@ export default function App() {
             className={page === "chat" ? "main-content chat-main" : "main-content"}
           >
             {loading ? (
-              <div className="loading-page" aria-label="正在打开莲花">
+              <div className="loading-page" aria-label="正在打开小莲">
                 <div className="skeleton skeleton-heading" />
                 <div className="skeleton skeleton-hero" />
                 <div className="skeleton skeleton-composer" />
@@ -461,7 +461,7 @@ export default function App() {
         <Dialog
           open={settings}
           onOpenChange={setSettings}
-          title="我的莲花"
+          title="我的小莲"
           description="了解当前的连接与记录状态。"
         >
           <dl className="settings-list">
@@ -533,7 +533,7 @@ function Sources({
         <LotusMark size={70} />
         <div>
           <h2>原文、解释，各有安放</h2>
-          <p>莲花先查找资料，再依据原文作答。引用会附上篇名与位置，方便你回到上下文核对。</p>
+          <p>小莲先查找资料，再依据原文作答。引用会附上篇名与位置，方便你回到上下文核对。</p>
         </div>
       </section>
       <div className="source-book">
@@ -556,7 +556,7 @@ function Sources({
       </div>
       <div className="source-status">
         <span className="status-tag">{connected ? "检索服务已配置" : "检索服务尚未连接"}</span>
-        <p>检索不足时，莲花会说明资料不足，不补造原文或祖师观点。</p>
+        <p>检索不足时，小莲会说明资料不足，不补造原文或祖师观点。</p>
         <Button disabled={!canChat || !connected} onClick={onChat}>
           从一个问题开始
           <ArrowRightIcon size={17} />

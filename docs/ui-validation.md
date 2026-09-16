@@ -70,7 +70,7 @@ WRANGLER_LOG_PATH=/tmp/lotus-chat-ui-wrangler.log npx vite --config tests/backen
 
 修复：
 
-- **Markdown 回复退化成纯文本**：Streamdown 依赖 Tailwind 工具类，但 `styles.css` 没有 `@source` 登记其 dist，标题、列表编号、引用竖线、加粗全部丢失（实测 `ol` 为 `list-style: none`，`h2` 与正文同字号）。补 `@source "../node_modules/streamdown/dist/*.js"`，并把 `--color-background/foreground/muted/border/primary` 等语义色映射到莲花配色，避免代码块、表格、外链弹层出现 shadcn 默认的黑白灰。在此基础上用 `[data-streamdown="…"]` 收敛标题字号、列表缩进、引用样式到陪伴式阅读的密度。
+- **Markdown 回复退化成纯文本**：Streamdown 依赖 Tailwind 工具类，但 `styles.css` 没有 `@source` 登记其 dist，标题、列表编号、引用竖线、加粗全部丢失（实测 `ol` 为 `list-style: none`，`h2` 与正文同字号）。补 `@source "../node_modules/streamdown/dist/*.js"`，并把 `--color-background/foreground/muted/border/primary` 等语义色映射到小莲配色，避免代码块、表格、外链弹层出现 shadcn 默认的黑白灰。在此基础上用 `[data-streamdown="…"]` 收敛标题字号、列表缩进、引用样式到陪伴式阅读的密度。
 - **待确认卡挂起时按 Enter 会吞掉草稿**：原 `onNew` 在 `waitingForApproval` 时直接 `return`，assistant-ui 已清空输入框，用户的话无声消失。现在把文本放回输入框；断线时同理。
 - **系统提示只给 UTC 时间**：北京 0–8 点模型会把“今天”算成前一天。改为注入北京日期、星期、时刻并说明日程 `dueAt` 用 `+08:00`；新增 `tests/backend/time.test.ts` 锁定跨日边界。
 - **“重试回复”按钮实际是发空消息**：原实现调用 `sendMessage()` 无参数。改为 `regenerate()`，且只在确实有出错的用户消息、已在线、未运行时显示。
@@ -93,15 +93,13 @@ WRANGLER_LOG_PATH=/tmp/lotus-chat-ui-wrangler.log npx vite --config tests/backen
 - **时段问候与起手句**：欢迎页按北京时段说「夜深了 / 早安 / 午安 / 下午好 / 晚上好」，正式账号有名字时带称呼（本地开发身份不称呼）；四个起手句顺序随时段变化。实测 14:43 显示「下午好」、首个起手句为「说说今天的心情」。
 - **今日日程条**：对话入口上方一行，列今天到期未完成的日程（≤3 条，按时间），点开进编辑表单可标记完成，过时的标「已过时间」，可关闭到明天（sessionStorage）。实测点开进入「编辑记录」弹窗，关闭后消失。
 - **近况上下文**：服务端把最近 6 条记录 + 今天未完成日程压成两行摘要放进系统提示（只放标题/数量/时间，标题去空白截 40 字，正文不进）。实测用户问「不用查记录，我昨天念了多少」，模型零工具调用直接答「昨天念佛 1080 声。今晚 16:43 有晚课的日程」。系统提示同时要求「像常来往的道友，先接住状态再谈事；简短口语，两三句」。
-- **消息级操作**：悬停出现「复制」；用户最后一条有「改一改」（预填回输入框，发送时用 `messageId` 替换并从该处重新回复，之后的对话被替换，有提示条和「不改了」）；最后一条**不含工具调用**的回复有「换一种说法」（`regenerate`，回复数不增加、内容变化）；所有回复有「存为笔记」（标题预填「莲花说」，正文为回复原文，走原有确认流程）。触屏常显淡色，桌面悬停浮现。实测编辑重发后用户消息数不变、刷新后历史一致。
-
-明确不做的：主动推送/定时问候、亲密度/打卡天数、消息评分、情绪值/内心独白、立绘/语音——理由见调研文档末尾。
+- **消息级操作**：悬停出现「复制」；用户最后一条有「改一改」（预填回输入框，发送时用 `messageId` 替换并从该处重新回复，之后的对话被替换，有提示条和「不改了」）；最后一条**不含工具调用**的回复有「换一种说法」（`regenerate`，回复数不增加、内容变化）；所有回复有「存为笔记」（标题预填「小莲说」，正文为回复原文，走原有确认流程）。触屏常显淡色，桌面悬停浮现。实测编辑重发后用户消息数不变、刷新后历史一致。
 
 ## 2026-09-15 夜：首屏瘦身与流式滚动核查
 
 这轮先量再改。用 `build.sourcemap` 产出 sourcemap，按模块归因 Chat 分包的真实构成（不是猜）：`ai` 534 KB、`@assistant-ui/core` 279 KB、**`parse5` 269 KB**、`zod/v3` 147 KB。
 
-- **去掉 parse5（909 kB → 739 kB，gzip 266 → 214，-19%）**：269 KB 的完整 HTML5 解析器来自 Streamdown 默认启用的 `rehype-raw`，而莲花从不渲染模型输出的原始 HTML。做法两步：① `Chat.tsx` 用 `defaultRehypePlugins` 取差集剔除 `raw`（不硬编码插件列表，上游新增默认插件仍会带上，`sanitize`/`harden` 保留）；② Streamdown 对 rehype-raw 是**顶层静态 import，打包器摇不掉**，故在 `vite.config.ts` 把它 alias 到 `src/lib/rehype-raw-stub.ts`——Streamdown 对该导入的唯一用途是恒等比较，空函数即可满足。实测产物中 `parse5` 出现次数为 0。
+- **去掉 parse5（909 kB → 739 kB，gzip 266 → 214，-19%）**：269 KB 的完整 HTML5 解析器来自 Streamdown 默认启用的 `rehype-raw`，而小莲从不渲染模型输出的原始 HTML。做法两步：① `Chat.tsx` 用 `defaultRehypePlugins` 取差集剔除 `raw`（不硬编码插件列表，上游新增默认插件仍会带上，`sanitize`/`harden` 保留）；② Streamdown 对 rehype-raw 是**顶层静态 import，打包器摇不掉**，故在 `vite.config.ts` 把它 alias 到 `src/lib/rehype-raw-stub.ts`——Streamdown 对该导入的唯一用途是恒等比较，空函数即可满足。实测产物中 `parse5` 出现次数为 0。
 - **安全性同时变好，且已验证**：让真实模型原样输出一段含 `<img onerror>`、`<script>`、`<b>` 的内容，结果 DOM 里真实 `img`/`script`/`b` 元素均为 0，HTML 以纯文本显示，`window.__XSS` 未被置位；同一段里的标题、有序列表、加粗、引用、行内代码、链接六项 Markdown 仍全部正常渲染。新增 `tests/backend/markdown-safety.test.ts` 锁住这条边界（共 101 项单测通过）。
 - **`zod/v3` 147 KB 不动**：它由 `@ai-sdk/provider-utils` 为兼容 v3/v4 schema 而引入，属 SDK 内部依赖，强行替换会破坏工具参数校验。记录在案，不做。
 - **流式滚动：先报的"被拽回底部"是我的测试有问题，不是产品 bug。** 用 `el.scrollTop = 0` 程序化跳转时，恰好落在 `scrollHeight` 变化的帧上，而 assistant-ui 的 `isUserScrollUp` 要求 `scrollHeight` 相等才判定为用户上滚，于是漏判。改用**真实滚轮手势**复现：上滚后停在 0、2.5 秒内持续有新 token 也没有被拽回、「回到最新消息」按钮正常出现、点击后回到底部。结论是当前行为正确，不需要改代码——记在这里是为了防止以后有人照着错误的测法再"修"一遍。

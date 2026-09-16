@@ -1,7 +1,7 @@
 /**
  * rehype-raw 的替身。
  *
- * 莲花从不渲染模型输出的原始 HTML：`Chat.tsx` 把 `raw` 从 Streamdown 的
+ * 小莲从不渲染模型输出的原始 HTML：`Chat.tsx` 把 `raw` 从 Streamdown 的
  * `defaultRehypePlugins` 里剔除，Streamdown 随即改走「html 节点当纯文本显示」的分支。
  * 但 Streamdown 对 rehype-raw 是顶层静态 import，打包器无法摇掉，于是整个 parse5
  * HTML 解析器（约 269 kB 源码）仍会进首屏分包。

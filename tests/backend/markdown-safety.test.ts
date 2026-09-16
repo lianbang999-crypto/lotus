@@ -3,7 +3,7 @@ import { defaultRehypePlugins } from "streamdown";
 import rehypeRawStub from "../../src/lib/rehype-raw-stub";
 
 /**
- * 莲花不渲染模型输出的原始 HTML。这条边界由两处共同保证：
+ * 小莲不渲染模型输出的原始 HTML。这条边界由两处共同保证：
  * 1) Chat.tsx 把 `raw` 从 Streamdown 默认插件里剔除（走「html 当纯文本」分支）；
  * 2) vite.config.ts 把 rehype-raw 整体 alias 成替身，避免 parse5 进首屏分包。
  * 任何一处被改回都应让这里失败，而不是悄悄把 HTML 放进 DOM。

@@ -1,4 +1,4 @@
-# 莲花 Lotus
+# 小莲 Lotus
 
 净土伴修个人助理。基于 Cloudflare Agents 官方 starter，使用 React、shadcn 风格的 Radix 组件、assistant-ui 对话运行时、Schedule-X 日历和 cal-heatmap。个人数据保存在每个账号独立的 Durable Object SQLite 中。
 
@@ -40,7 +40,7 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 
 界面不是「基于某个模板」，而是自建 CSS + 少量成熟无头组件。下表按**是否真的跑在代码里**区分，避免把调研看过的项目误记成依赖。
 
-| 层 | 用的项目 | 版本 / 许可证 | 在莲花里负责什么 |
+| 层 | 用的项目 | 版本 / 许可证 | 在小莲里负责什么 |
 | --- | --- | --- | --- |
 | 对话运行时 | [assistant-ui](https://github.com/assistant-ui/assistant-ui) | 0.15.19 · MIT | `Thread/Composer` 原语：视口自动滚动、「回到最新」、输入框状态与 IME 合成、Enter/Shift+Enter |
 | Agent 通道 | `agents` + `@cloudflare/ai-chat` | 0.17.4 / 0.9.3 · MIT | WebSocket 会话、消息持久化、原生工具审批帧、`clearHistory` |
@@ -54,7 +54,7 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 
 **只是设计参考、未引入代码**：Zola（布局）、prompt-kit（视觉细节）、Haven（陪伴感）、以及 AIRI / KouriChat / Everthine / SillyTavern / EverOtome 等陪伴类项目的交互取舍，分别见 [设计调研](docs/design-references.md) 与 [陪伴类项目调研](docs/companion-references.md)。
 
-**关于 shadcn/ui**：`components.json` 存在（new-york / stone），但仓库里**没有安装 shadcn 组件**——`src/components/ui/` 下的 `button.tsx`、`dialog.tsx` 是按 shadcn 约定手写的薄封装（合计 10 行），直接包 Radix，样式走 `styles.css` 的语义类（`button-primary` 等）而非 Tailwind 工具类串。这是刻意选择：莲花的视觉是 3300 行手写 CSS，若引入 shadcn 组件自带的 Tailwind 工具类，等于在同一个项目里并行维护两套样式体系。保留 `components.json` 是为了以后 `npx shadcn add` 能落到正确目录。
+**关于 shadcn/ui**：`components.json` 存在（new-york / stone），但仓库里**没有安装 shadcn 组件**——`src/components/ui/` 下的 `button.tsx`、`dialog.tsx` 是按 shadcn 约定手写的薄封装（合计 10 行），直接包 Radix，样式走 `styles.css` 的语义类（`button-primary` 等）而非 Tailwind 工具类串。这是刻意选择：小莲的视觉是 3300 行手写 CSS，若引入 shadcn 组件自带的 Tailwind 工具类，等于在同一个项目里并行维护两套样式体系。保留 `components.json` 是为了以后 `npx shadcn add` 能落到正确目录。
 
 > 若将来考虑真正引入 shadcn：注意 2026-07 起它的默认底层已从 Radix 换成 [Base UI](https://base-ui.com)（同一批作者的新项目，npm 包已更名为 `@base-ui/react`，2026-09 为 1.8.0）。**Radix 未被弃用**，shadcn 明确表示两者都会长期支持，且不建议已有项目迁移；我们用的 `@radix-ui/react-dialog@1.1.23` 也是当前最新（2026-07-31），近 12 个月有 81 次发布，维护正常。`npx shadcn init -b radix` 可继续沿用 Radix。结论是现状无需变动。
 
@@ -74,8 +74,8 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 
 本项目尚未部署、提交或推送。真实模型连接状态与验收见 [模型接入](docs/model-integration.md)；正式域名 SSO、生产检索与大安远程索引尚未验收。匿名到正式账号迁移、后台推送、全量统计与分页、数据导出/恢复均不属于已完成能力。首版列表最多返回最近 300 条记录，首页/账本/热力图统计基于返回记录；不以记录数量判断功德、修行证量或往生资格。
 
-项目由 `cloudflare/agents-starter` 演进，保留上游 MIT LICENSE。设计组件按莲花的配色、间距与交互定制。`integrations/wenchao/prepared` 和含文库全文的导入批次为本地产物，均排除出 Git。
+项目由 `cloudflare/agents-starter` 演进，保留上游 MIT LICENSE。设计组件按小莲的配色、间距与交互定制。`integrations/wenchao/prepared` 和含文库全文的导入批次为本地产物，均排除出 Git。
 
 聊天界面的本机浏览器验收见 [界面验证](docs/ui-validation.md)。当前每个账号是一段持续对话，尚未实现多个独立聊天主题。
 
-GitHub 界面参考、许可证与改造取舍见 [设计调研](docs/design-references.md)。当前方向为 Zola 的聊天布局、prompt-kit 的视觉细节和 Haven 的轻量陪伴感；本次未复制这些项目代码或迁移后端。人机恋 / 陪伴类项目（AIRI、KouriChat、Everthine、SillyTavern 等）的交互借鉴与明确不做的清单见 [陪伴类项目调研](docs/companion-references.md)：已落地时段问候、今日日程条、近况上下文、消息级操作（复制 / 改一改 / 换一种说法 / 存为笔记）。
+GitHub 界面参考、许可证与改造取舍见 [设计调研](docs/design-references.md)。当前方向为 Zola 的聊天布局、prompt-kit 的视觉细节和 Haven 的轻量陪伴感；本次未复制这些项目代码或迁移后端。人机恋 / 陪伴类项目（AIRI、KouriChat、Everthine、SillyTavern 等）的交互借鉴与边界取舍见 [陪伴类项目调研](docs/companion-references.md)：已落地时段问候、今日日程条、近况上下文、消息级操作（复制 / 改一改 / 换一种说法 / 存为笔记）。

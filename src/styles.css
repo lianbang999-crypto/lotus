@@ -5,7 +5,7 @@
   --color-lotus: #536a47;
   --color-paper: #f8f9f5;
   --font-sans: "Geist", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  /* Streamdown 的表格、代码块与外链确认弹层引用 shadcn 语义色，这里映射到莲花配色。 */
+  /* Streamdown 的表格、代码块与外链确认弹层引用 shadcn 语义色，这里映射到小莲配色。 */
   --color-background: #fbfcf8;
   --color-foreground: #35462e;
   --color-muted: #eef2e6;
@@ -2962,7 +2962,7 @@ button svg {
   line-height: 1.95;
   color: #4f6144;
 }
-/* 莲花回复的 Markdown 排版：在 Streamdown 默认工具类之上收敛到陪伴式阅读的字号与间距。 */
+/* 小莲回复的 Markdown 排版：在 Streamdown 默认工具类之上收敛到陪伴式阅读的字号与间距。 */
 .message-text [data-streamdown="heading-1"],
 .message-text [data-streamdown="heading-2"],
 .message-text [data-streamdown="heading-3"],

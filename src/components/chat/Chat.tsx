@@ -126,13 +126,13 @@ function Welcome({ session }: { session: SessionInfo | null }) {
       <div className="welcome-lotus">
         <LotusMark size={57} />
       </div>
-      <span className="welcome-overline">莲花 · 你的净土伴修助手</span>
+      <span className="welcome-overline">小莲 · 你的净土伴修助手</span>
       <h1>
         <span className="welcome-first-line">
           {word}
           {name ? `，${name}` : ""}，
         </span>
-        <span>想和莲花说些什么？</span>
+        <span>想和小莲说些什么？</span>
       </h1>
       <p>
         {line}
@@ -339,7 +339,7 @@ function withDays(messages: UIMessage[]) {
   });
 }
 /**
- * 去掉 Streamdown 默认的 rehype-raw：莲花的回复不需要渲染模型输出的原始 HTML，
+ * 去掉 Streamdown 默认的 rehype-raw：小莲的回复不需要渲染模型输出的原始 HTML，
  * 保留它反而要背上完整的 parse5 HTML 解析器（约 269 kB 源码）。去掉后 Streamdown
  * 自动改走「把 html 节点当纯文本显示」的分支——既更小，也更安全。
  * 用 defaultRehypePlugins 取差集而不是硬编码，上游新增默认插件时不会被我们丢掉。
@@ -591,7 +591,7 @@ function Evidence({ output }: { output: unknown }) {
       {Boolean(data.retrieval?.unavailableCorpora?.length) && (
         <p className="field-hint">部分文库尚未可用，本次只展示已取得的资料。</p>
       )}
-      <p className="field-hint">原文证据与莲花的生活化解释分开阅读。</p>
+      <p className="field-hint">原文证据与小莲的生活化解释分开阅读。</p>
     </div>
   );
 }
@@ -802,8 +802,8 @@ function OfflineChat(props: ChatProps) {
         >
           <textarea
             ref={input}
-            aria-label="发送给莲花"
-            placeholder="说说你的想法，或让莲花帮你做点什么…"
+            aria-label="发送给小莲"
+            placeholder="说说你的想法，或让小莲帮你做点什么…"
             rows={3}
             maxLength={20000}
             value={draft}
@@ -819,7 +819,7 @@ function OfflineChat(props: ChatProps) {
             <RecordMenu onCreate={props.onCreate} content={draft} />
             <span className="composer-mode">
               <LotusMark size={15} />
-              莲花伴修
+              小莲伴修
             </span>
             <button className="agent-send" aria-label="发送消息" disabled={!draft.trim()}>
               <ArrowUpIcon size={20} />
@@ -990,7 +990,7 @@ function ConnectedChat(props: ChatProps) {
                   ) : (
                     <>
                       <LotusMark size={20} />
-                      莲花
+                      小莲
                     </>
                   )}
                   <MessageStamp at={at} />
@@ -1020,7 +1020,7 @@ function ConnectedChat(props: ChatProps) {
                     disabled={busy}
                     onEdit={message.role === "user" && message.id === lastUserId ? () => startEdit(message) : undefined}
                     onRegenerate={message.role === "assistant" && canRegenerate(message) ? () => void regenerate() : undefined}
-                    onSaveNote={message.role === "assistant" ? () => props.onCreate("note", textOf(message), "莲花说") : undefined}
+                    onSaveNote={message.role === "assistant" ? () => props.onCreate("note", textOf(message), "小莲说") : undefined}
                   />
                 )}
               </div>
@@ -1033,7 +1033,7 @@ function ConnectedChat(props: ChatProps) {
             <i />
             <i />
             <i />
-            <span>莲花正在整理…</span>
+            <span>小莲正在整理…</span>
           </div>
         )}
       </div>
@@ -1075,7 +1075,7 @@ function ConnectedChat(props: ChatProps) {
           )}
           {editing && (
             <p className="chat-reconnecting chat-editing-bar" role="status">
-              改好后发送，莲花会从这一条重新回复；之后的对话会被替换。
+              改好后发送，小莲会从这一条重新回复；之后的对话会被替换。
               <button type="button" className="text-link" onClick={cancelEdit}>
                 不改了
               </button>
@@ -1088,7 +1088,7 @@ function ConnectedChat(props: ChatProps) {
           )}
           {!online && (
             <p className="chat-reconnecting" role="status">
-              {disconnected ? "连接已断开，请重新连接后重试。" : "正在连接莲花…"}
+              {disconnected ? "连接已断开，请重新连接后重试。" : "正在连接小莲…"}
               {disconnected && (
                 <button
                   type="button"
@@ -1105,8 +1105,8 @@ function ConnectedChat(props: ChatProps) {
           )}
           <ComposerPrimitive.Root className="agent-composer">
             <ComposerPrimitive.Input
-              aria-label="发送给莲花"
-              placeholder="说说你的想法，或让莲花帮你做点什么…"
+              aria-label="发送给小莲"
+              placeholder="说说你的想法，或让小莲帮你做点什么…"
               minRows={active ? 2 : 3}
               maxRows={6}
               maxLength={20000}
@@ -1117,7 +1117,7 @@ function ConnectedChat(props: ChatProps) {
               <RecordMenu onCreate={props.onCreate} />
               <span className="composer-mode">
                 <LotusMark size={15} />
-                莲花伴修
+                小莲伴修
               </span>
               <span className="composer-hint" aria-hidden="true">
                 Enter 发送 · Shift+Enter 换行
@@ -1146,7 +1146,7 @@ function ConnectedChat(props: ChatProps) {
         open={confirmClear}
         onOpenChange={setConfirmClear}
         title="开始新的对话？"
-        description="这段对话会从莲花这里清空，已确认保存的记录不受影响。"
+        description="这段对话会从小莲这里清空，已确认保存的记录不受影响。"
       >
         <div className="dialog-footer">
           <Button variant="ghost" onClick={() => setConfirmClear(false)}>
