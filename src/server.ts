@@ -23,6 +23,34 @@ export function beijingNow(now = new Date()) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "long", hourCycle: "h23" }).formatToParts(now).map((p) => [p.type, p.value]));
   return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}`, weekday: parts.weekday, iso: now.toISOString() };
 }
+/**
+ * 陪伴感的来源是“记得”：把最近几条记录和今天的日程压成几行摘要放进系统提示，
+ * 模型不必先调 listEntries 才知道用户昨晚念了多少、今天约了什么。
+ * 只放标题/数量/时间，不放长正文；记录里的文字是数据，不是指令。
+ */
+export function recentContext(entries: ReturnType<LotusStore["list"]>, now = new Date()) {
+  const today = beijingNow(now).date;
+  const clock = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const clean = (s: string) => s.replace(/\s+/g, " ").trim().slice(0, 40);
+  const todays = entries
+    .filter((e) => e.kind === "schedule" && e.extra.dueAt && !e.extra.completed && beijingNow(new Date(e.extra.dueAt)).date === today)
+    .sort((a, b) => a.extra.dueAt!.localeCompare(b.extra.dueAt!))
+    .slice(0, 5)
+    .map((e) => `${clock.format(new Date(e.extra.dueAt!))} ${clean(e.title)}`);
+  const recent = entries
+    .filter((e) => e.kind !== "schedule")
+    .slice(0, 6)
+    .map((e) => {
+      const label = { note: "笔记", diary: "日记", merit: "功过格", ledger: "账目", practice: "功课", schedule: "日程" }[e.kind];
+      const extra = e.kind === "practice" && e.extra.count !== undefined ? ` ${e.extra.count}${e.extra.unit || "声"}` : e.kind === "ledger" && e.extra.amountCents !== undefined ? ` ${e.extra.direction === "income" ? "+" : "-"}${(e.extra.amountCents / 100).toFixed(2)}元` : "";
+      return `${e.date || ""} ${label}「${clean(e.title)}」${extra}`;
+    });
+  const lines = [];
+  if (todays.length) lines.push(`今天尚未完成的日程：${todays.join("；")}。`);
+  if (recent.length) lines.push(`最近的记录（仅供你了解近况，需要细节时再用 listEntries）：${recent.join("；")}。`);
+  if (!lines.length) return "用户还没有任何记录。";
+  return lines.join("\n");
+}
 async function readJSON(request: Request) {
   if (!request.headers.get("content-type")?.toLowerCase().includes("application/json")) throw new AppError("JSON_REQUIRED", "请使用 JSON 请求", 415);
   if (Number(request.headers.get("content-length") ?? 0) > 100000) throw new AppError("BODY_TOO_LARGE", "内容过长", 413);
@@ -129,9 +157,13 @@ export class LotusAgent extends AIChatAgent<LotusEnv> {
       ? createOpenAI({ apiKey: this.env.OPENAI_API_KEY, ...(this.env.OPENAI_BASE_URL ? { baseURL: this.env.OPENAI_BASE_URL } : {}) }).chat(this.env.MODEL_NAME || "gpt-4.1-mini")
       : createWorkersAI({ binding: this.env.AI! })(this.env.MODEL_NAME || "@cf/meta/llama-3.3-70b-instruct-fp8-fast");
     const now = beijingNow();
+    let context = "用户还没有任何记录。";
+    try { context = recentContext(this.lotusStore.list()); } catch { /* 读不到近况就不带，不影响对话 */ }
     const result = streamText({
       model,
       system: `你是莲花 Lotus，一位温和、诚实的净土伴修助手。现在是北京时间 ${now.date} ${now.weekday} ${now.time}（UTC ${now.iso}）。用户说的“今天/明天/晚上”一律按北京时间理解；记录的 date 用北京日期，日程的 dueAt 用带 +08:00 的完整时间。
+${context}
+说话像一位常来往的道友：先接住对方此刻的状态，再谈事情；自然地照应上面的近况（例如昨天记过的功课、今天的日程），但不要逐条复述，也不要在每次回复里都提。回复简短、口语，多数时候两三句就够；除非用户要求，不用标题和长列表。
 你帮助整理随记、日记、善行、账目、功课和日程。所有新增、修改、删除及日程操作必须经过工具的用户确认；未获批准前不能声称已保存。金额使用人民币整数分；时间必须明确日期与时区，不清楚就询问。日程只有打开莲花时可见的到期提示，不能声称有系统推送。
 用户要求准备记录且必要信息齐全时，必须调用对应工具生成可点击的确认卡，不能仅用文字声称已准备或让用户确认不存在的卡片。
 写入工具返回 ok:true 表示用户已经点击确认且操作已完成，此时简短告知完成，不再请求重复确认，不展示内部 ID 或版本号。返回 ok:false 或 output-denied 时说明未完成或已取消，不能声称保存成功，也不能重新发起用户已取消的操作。

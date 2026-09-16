@@ -34,6 +34,31 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 - `AIChatAgent` 流式会话、消息持久化、语义工具、原生审批卡片；服务器额外核对提案内容、确认帧和幂等执行记录。
 - SDK 版本固定 `@cloudflare/ai-chat@0.9.3`：实测 0.9.4 调用 Agents 0.17.4 不存在的 `_withAgentSpan`，导致 DO 无法启动。另固定 `ai@6.0.202` 与 `@ai-sdk/react@3.0.204` 以保持原生工具续答兼容。请保留 lockfile，升级时运行客户端解析器和真实 Worker 浏览器流程。
 - `searchDharma` 只调用原有 wenchao 检索，严格验证语料角色和来源地址。来源卡将原文与解释区分。
+- 聊天回复的 Markdown 由 Streamdown 渲染，但**不启用 `rehype-raw`**：模型输出的原始 HTML 以纯文本显示而非进入 DOM。这既是安全边界，也让首屏分包省掉 parse5（Chat 分包 909→739 kB，gzip 266→214）。约束由 `src/lib/rehype-raw-stub.ts`、`vite.config.ts` 的 alias 与 `tests/backend/markdown-safety.test.ts` 三处共同保证，改动前请先看该测试的注释。
+
+## UI/UX 技术栈（真实在用）
+
+界面不是「基于某个模板」，而是自建 CSS + 少量成熟无头组件。下表按**是否真的跑在代码里**区分，避免把调研看过的项目误记成依赖。
+
+| 层 | 用的项目 | 版本 / 许可证 | 在莲花里负责什么 |
+| --- | --- | --- | --- |
+| 对话运行时 | [assistant-ui](https://github.com/assistant-ui/assistant-ui) | 0.15.19 · MIT | `Thread/Composer` 原语：视口自动滚动、「回到最新」、输入框状态与 IME 合成、Enter/Shift+Enter |
+| Agent 通道 | `agents` + `@cloudflare/ai-chat` | 0.17.4 / 0.9.3 · MIT | WebSocket 会话、消息持久化、原生工具审批帧、`clearHistory` |
+| 无障碍交互 | [Radix UI](https://www.radix-ui.com/) | dialog 1.1.23 / slot 1.3.3 · MIT | 「我的空间」抽屉与各弹窗：焦点陷阱、Esc 关闭、焦点归位 |
+| Markdown 渲染 | [Streamdown](https://github.com/vercel/streamdown) | 2.6.0 · Apache-2.0 | 流式 Markdown、未闭合语法容错、流式光标；**已禁用 `rehype-raw`** |
+| 图标 | [Phosphor Icons](https://phosphoricons.com/) | 2.1.10 · MIT | 全站图标（regular/duotone/light 三种字重） |
+| 样式 | [Tailwind CSS](https://tailwindcss.com/) v4 | 4.3.3 · MIT | 仅作为 `@theme` 变量与 `@source` 扫描；组件样式是 `src/styles.css` 手写 |
+| 样式工具 | `clsx` + `tailwind-merge` + `class-variance-authority` | · MIT / Apache-2.0 | shadcn 式 `cn()` 与 Button 变体 |
+| 日历 | [Schedule-X](https://schedule-x.dev/) | 4.8.0 · MIT | 月视图 / 议程视图（抽屉内，懒加载） |
+| 热力图 | [cal-heatmap](https://cal-heatmap.com/) | 4.2.4 · MIT | 功课与省察足迹（抽屉内，懒加载） |
+
+**只是设计参考、未引入代码**：Zola（布局）、prompt-kit（视觉细节）、Haven（陪伴感）、以及 AIRI / KouriChat / Everthine / SillyTavern / EverOtome 等陪伴类项目的交互取舍，分别见 [设计调研](docs/design-references.md) 与 [陪伴类项目调研](docs/companion-references.md)。
+
+**关于 shadcn/ui**：`components.json` 存在（new-york / stone），但仓库里**没有安装 shadcn 组件**——`src/components/ui/` 下的 `button.tsx`、`dialog.tsx` 是按 shadcn 约定手写的薄封装（合计 10 行），直接包 Radix，样式走 `styles.css` 的语义类（`button-primary` 等）而非 Tailwind 工具类串。这是刻意选择：莲花的视觉是 3300 行手写 CSS，若引入 shadcn 组件自带的 Tailwind 工具类，等于在同一个项目里并行维护两套样式体系。保留 `components.json` 是为了以后 `npx shadcn add` 能落到正确目录。
+
+> 若将来考虑真正引入 shadcn：注意 2026-07 起它的默认底层已从 Radix 换成 [Base UI](https://base-ui.com)（同一批作者的新项目，npm 包已更名为 `@base-ui/react`，2026-09 为 1.8.0）。**Radix 未被弃用**，shadcn 明确表示两者都会长期支持，且不建议已有项目迁移；我们用的 `@radix-ui/react-dialog@1.1.23` 也是当前最新（2026-07-31），近 12 个月有 81 次发布，维护正常。`npx shadcn init -b radix` 可继续沿用 Radix。结论是现状无需变动。
+
+**`@ai-sdk/react@3.0.204` 不在 `src` 里直接 import**，它是 `agents` 与 `@cloudflare/ai-chat` 的 peer dependency，必须显式固定版本（原因见上一节的兼容性说明），不要当成未使用依赖删掉。
 
 ## 正式服务接线
 
@@ -53,4 +78,4 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 
 聊天界面的本机浏览器验收见 [界面验证](docs/ui-validation.md)。当前每个账号是一段持续对话，尚未实现多个独立聊天主题。
 
-GitHub 界面参考、许可证与改造取舍见 [设计调研](docs/design-references.md)。当前方向为 Zola 的聊天布局、prompt-kit 的视觉细节和 Haven 的轻量陪伴感；本次未复制这些项目代码或迁移后端。
+GitHub 界面参考、许可证与改造取舍见 [设计调研](docs/design-references.md)。当前方向为 Zola 的聊天布局、prompt-kit 的视觉细节和 Haven 的轻量陪伴感；本次未复制这些项目代码或迁移后端。人机恋 / 陪伴类项目（AIRI、KouriChat、Everthine、SillyTavern 等）的交互借鉴与明确不做的清单见 [陪伴类项目调研](docs/companion-references.md)：已落地时段问候、今日日程条、近况上下文、消息级操作（复制 / 改一改 / 换一种说法 / 存为笔记）。

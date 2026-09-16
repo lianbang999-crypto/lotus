@@ -14,5 +14,12 @@ export default defineConfig({
       for (const file of Object.keys(bundle)) if (file === ".dev.vars" || file.startsWith(".dev.vars.")) delete bundle[file];
     },
   }],
-  resolve: { alias: { "@": new URL("./src", import.meta.url).pathname } }
+  resolve: {
+    alias: {
+      "@": new URL("./src", import.meta.url).pathname,
+      // 莲花不渲染模型输出的原始 HTML（见 src/lib/rehype-raw-stub.ts）。
+      // Streamdown 对 rehype-raw 是静态 import，不替换就会把 parse5 打进首屏分包。
+      "rehype-raw": new URL("./src/lib/rehype-raw-stub.ts", import.meta.url).pathname,
+    },
+  },
 });

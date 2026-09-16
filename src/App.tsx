@@ -132,12 +132,12 @@ export default function App() {
     setPage(next);
     setMobileOpen(false);
   }
-  function create(kind: EntryKind, content?: string) {
+  function create(kind: EntryKind, content?: string, title?: string) {
     if (!session?.capabilities.write) {
       setLogin(true);
       return;
     }
-    setEditor({ kind, content });
+    setEditor({ kind, content, title });
   }
   const edit = useCallback((entry: Entry) => setEditor({ kind: entry.kind, entry }), []);
   async function propose(operation: ProposalInput) {
@@ -369,6 +369,7 @@ export default function App() {
                       (p) => p.status === "pending" || chatProposalIds.includes(p.id),
                     )}
                     onCreate={create}
+                    onEdit={edit}
                     onResolve={resolve}
                     onLogin={() => setLogin(true)}
                   />

@@ -2822,6 +2822,130 @@ button svg {
     display: none;
   }
 }
+/* 消息轻操作：桌面悬停浮现，触屏常显但更淡；不做评分，不做点赞。 */
+.message-actions {
+  display: flex;
+  gap: 2px;
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.chat-message:hover .message-actions,
+.chat-message:focus-within .message-actions {
+  opacity: 1;
+}
+.message-user .message-actions {
+  justify-content: flex-end;
+}
+.message-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: #98a68a;
+  padding: 4px 7px;
+  border-radius: 6px;
+}
+.message-actions button:hover:not(:disabled) {
+  background: #eef2e6;
+  color: #55693f;
+}
+.message-actions button:disabled {
+  opacity: 0.35;
+}
+@media (hover: none), (pointer: coarse) {
+  .message-actions {
+    opacity: 0.75;
+  }
+}
+.message-editing {
+  font-style: normal;
+  font-size: 10px;
+  color: #8d9c7c;
+  background: #eef2e6;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-left: 2px;
+}
+.chat-editing-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.chat-editing-bar .text-link {
+  font-size: 11px;
+}
+/* 今天的日程条：对话入口上方一行，可点开查看/完成，可关闭到明天。 */
+.chat-today {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: 730px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 10px 30px 0;
+  flex-shrink: 0;
+}
+.chat-today-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #98a68a;
+}
+.chat-today-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid #e1e7d7;
+  border-radius: 999px;
+  background: #f6f8f0;
+  font-size: 11.5px;
+  color: #5d7150;
+  max-width: 100%;
+}
+.chat-today-item time {
+  font-variant-numeric: tabular-nums;
+  color: #8ea07a;
+}
+.chat-today-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+.chat-today-item small {
+  font-size: 9.5px;
+  color: #b58c66;
+}
+.chat-today-item.is-overdue {
+  border-color: #eadfcd;
+  background: #fbf7f0;
+}
+.chat-today-item:hover:not(:disabled) {
+  background: #edf2e3;
+  border-color: #cedabb;
+}
+.chat-today-item:disabled {
+  opacity: 0.8;
+}
+.chat-today-close {
+  margin-left: auto;
+  padding: 4px;
+  color: #aab59b;
+}
+@media (max-width: 640px) {
+  .chat-today {
+    padding: 8px 18px 0;
+  }
+  .chat-today-item span {
+    max-width: 150px;
+  }
+}
 .message-user .message-author {
   justify-content: flex-end;
 }

@@ -13,7 +13,7 @@ import {
   isToolUIPart,
   type UIMessage,
 } from "ai";
-import { Streamdown } from "streamdown";
+import { Streamdown, defaultRehypePlugins } from "streamdown";
 import {
   ArrowUpIcon,
   StopIcon,
@@ -30,6 +30,11 @@ import {
   WifiSlashIcon,
   ChatTeardropTextIcon,
   ArrowsClockwiseIcon,
+  HeartIcon,
+  ClockIcon,
+  CopyIcon,
+  PencilSimpleIcon,
+  BookmarkSimpleIcon,
 } from "@phosphor-icons/react";
 import { Button } from "../ui/button";
 import { Dialog } from "../ui/dialog";
@@ -51,20 +56,46 @@ type ChatProps = {
   session: SessionInfo | null;
   entries: Entry[];
   proposals: Proposal[];
-  onCreate: (kind: EntryKind, content?: string) => void;
+  onCreate: (kind: EntryKind, content?: string, title?: string) => void;
+  onEdit: (entry: Entry) => void;
   onResolve: (id: string, approved: boolean) => Promise<void>;
   onLogin: () => void;
 };
-const starters = [
-  { icon: FlowerLotusIcon, title: "记下今日功课", text: "帮我记录今天的念佛功课。" },
-  { icon: NotebookIcon, title: "说说今天的心情", text: "我想和你说说今天的心情。" },
-  {
+type Starter = { icon: typeof FlowerLotusIcon; title: string; text: string };
+const starterPool = {
+  practice: { icon: FlowerLotusIcon, title: "记下今日功课", text: "帮我记录今天的念佛功课。" },
+  mood: { icon: NotebookIcon, title: "说说今天的心情", text: "我想和你说说今天的心情。" },
+  dharma: {
     icon: BookOpenIcon,
     title: "问一个法义问题",
     text: "念佛时容易散乱，请帮我查找印光法师关于摄心念佛的开示，并附上原文出处。",
   },
-  { icon: CalendarBlankIcon, title: "安排一件小事", text: "帮我安排一个日程。" },
-];
+  schedule: { icon: CalendarBlankIcon, title: "安排一件小事", text: "帮我安排一个日程。" },
+  merit: { icon: HeartIcon, title: "做一次省察", text: "我想省察一下今天的言行。" },
+} satisfies Record<string, Starter>;
+const beijingHour = (now = new Date()) =>
+  Number(
+    new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Shanghai", hour: "numeric", hourCycle: "h23" }).format(now),
+  );
+/** 时段问候与起手句顺序：陪伴感来自“知道现在几点”，而不是固定的一句欢迎语。 */
+export function moment(now = new Date()) {
+  const hour = beijingHour(now);
+  const p = starterPool;
+  if (hour < 5 || hour >= 23)
+    return { word: "夜深了", line: "还没休息吗？有什么想说的，我都在。", starters: [p.mood, p.merit, p.practice, p.dharma] };
+  if (hour < 11)
+    return { word: "早安", line: "新的一天，从一声佛号开始。", starters: [p.practice, p.dharma, p.mood, p.schedule] };
+  if (hour < 14)
+    return { word: "午安", line: "歇一歇，也是功课的一部分。", starters: [p.mood, p.practice, p.dharma, p.schedule] };
+  if (hour < 18)
+    return { word: "下午好", line: "一声佛号，一段心事，或是生活里的小事。", starters: [p.mood, p.practice, p.dharma, p.schedule] };
+  return { word: "晚上好", line: "今天过得怎么样？可以慢慢和我说。", starters: [p.mood, p.merit, p.practice, p.dharma] };
+}
+/** 只在正式账号且有名字时称呼；本地开发身份叫“本地体验”，不该被当成人名。 */
+function displayName(session: SessionInfo | null) {
+  const name = session?.mode === "cloud" ? session.user?.name?.trim() : "";
+  return name && name.length <= 12 ? name : "";
+}
 const toolKinds: Record<string, EntryKind> = {
   saveNote: "note",
   writeDiary: "diary",
@@ -87,7 +118,9 @@ const names: Record<string, string> = {
   listEntries: "查找记录",
 };
 
-function Welcome() {
+function Welcome({ session }: { session: SessionInfo | null }) {
+  const { word, line } = moment();
+  const name = displayName(session);
   return (
     <div className="chat-welcome page-enter">
       <div className="welcome-lotus">
@@ -95,11 +128,14 @@ function Welcome() {
       </div>
       <span className="welcome-overline">莲花 · 你的净土伴修助手</span>
       <h1>
-        <span className="welcome-first-line">这一刻，</span>
+        <span className="welcome-first-line">
+          {word}
+          {name ? `，${name}` : ""}，
+        </span>
         <span>想和莲花说些什么？</span>
       </h1>
       <p>
-        一声佛号，一段心事，或是生活里的小事。
+        {line}
         <br className="mobile-break" />
         我在这里，陪你慢慢整理。
       </p>
@@ -107,6 +143,7 @@ function Welcome() {
   );
 }
 function Suggestions({ onSelect }: { onSelect: (text: string) => void }) {
+  const { starters } = moment();
   return (
     <div className="chat-suggestions" aria-label="试着这样开始">
       {starters.map((item) => (
@@ -115,6 +152,71 @@ function Suggestions({ onSelect }: { onSelect: (text: string) => void }) {
           <span>{item.title}</span>
         </button>
       ))}
+    </div>
+  );
+}
+const dayKey = (at: number | string | Date) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(at));
+const clock = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+/** 今天到期、尚未完成的日程，直接放进对话入口——这是产品承诺的“应用内到期提示”。 */
+function TodayStrip({ entries, canWrite, onEdit }: { entries: Entry[]; canWrite: boolean; onEdit: (entry: Entry) => void }) {
+  const today = dayKey(Date.now());
+  const key = `lotus:today-dismissed:${today}`;
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem(key) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const items = useMemo(
+    () =>
+      entries
+        .filter((e) => e.kind === "schedule" && e.extra.dueAt && !e.extra.completed && dayKey(e.extra.dueAt) === today)
+        .sort((a, b) => a.extra.dueAt!.localeCompare(b.extra.dueAt!))
+        .slice(0, 3),
+    [entries, today],
+  );
+  if (dismissed || items.length === 0) return null;
+  const now = Date.now();
+  return (
+    <div className="chat-today" role="status" aria-label="今天的日程">
+      <span className="chat-today-label">
+        <ClockIcon size={14} />
+        今天
+      </span>
+      {items.map((e) => {
+        const overdue = Date.parse(e.extra.dueAt!) < now;
+        return (
+          <button
+            key={e.id}
+            type="button"
+            className={`chat-today-item ${overdue ? "is-overdue" : ""}`}
+            disabled={!canWrite}
+            title={canWrite ? "查看或标记完成" : undefined}
+            onClick={() => onEdit(e)}
+          >
+            <time dateTime={e.extra.dueAt}>{clock.format(new Date(e.extra.dueAt!))}</time>
+            <span>{e.title}</span>
+            {overdue && <small>已过时间</small>}
+          </button>
+        );
+      })}
+      <button
+        type="button"
+        className="icon-link chat-today-close"
+        aria-label="今天不再提示"
+        onClick={() => {
+          setDismissed(true);
+          try {
+            sessionStorage.setItem(key, "1");
+          } catch {
+            /* 没有存储也只是不记住关闭状态 */
+          }
+        }}
+      >
+        <XIcon size={14} />
+      </button>
     </div>
   );
 }
@@ -235,6 +337,73 @@ function withDays(messages: UIMessage[]) {
     if (at !== null) lastDay = day;
     return { message, at, startsDay };
   });
+}
+/**
+ * 去掉 Streamdown 默认的 rehype-raw：莲花的回复不需要渲染模型输出的原始 HTML，
+ * 保留它反而要背上完整的 parse5 HTML 解析器（约 269 kB 源码）。去掉后 Streamdown
+ * 自动改走「把 html 节点当纯文本显示」的分支——既更小，也更安全。
+ * 用 defaultRehypePlugins 取差集而不是硬编码，上游新增默认插件时不会被我们丢掉。
+ */
+const { raw: _rawHtmlPlugin, ...safeRehypePlugins } = defaultRehypePlugins;
+const messageRehypePlugins = Object.values(safeRehypePlugins);
+const textOf = (message: UIMessage) =>
+  message.parts
+    .filter((p) => p.type === "text")
+    .map((p) => p.text)
+    .join("\n")
+    .trim();
+/** 消息悬停/长按后的轻操作：复制、换一种说法、改一改重发、存为笔记。不做评分，不做“点赞训练”。 */
+function MessageActions({
+  message,
+  disabled,
+  onRegenerate,
+  onEdit,
+  onSaveNote,
+}: {
+  message: UIMessage;
+  disabled: boolean;
+  onRegenerate?: () => void;
+  onEdit?: () => void;
+  onSaveNote?: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const text = textOf(message);
+  if (!text) return null;
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* 剪贴板不可用时按钮保持原样，不弹错误 */
+    }
+  }
+  return (
+    <div className="message-actions" aria-label="消息操作">
+      <button type="button" onClick={() => void copy()} aria-label="复制这段话">
+        <CopyIcon size={14} />
+        <span>{copied ? "已复制" : "复制"}</span>
+      </button>
+      {onEdit && (
+        <button type="button" disabled={disabled} onClick={onEdit} aria-label="改一改再发">
+          <PencilSimpleIcon size={14} />
+          <span>改一改</span>
+        </button>
+      )}
+      {onRegenerate && (
+        <button type="button" disabled={disabled} onClick={onRegenerate} aria-label="换一种说法">
+          <ArrowsClockwiseIcon size={14} />
+          <span>换一种说法</span>
+        </button>
+      )}
+      {onSaveNote && (
+        <button type="button" disabled={disabled} onClick={onSaveNote} aria-label="存为笔记">
+          <BookmarkSimpleIcon size={14} />
+          <span>存为笔记</span>
+        </button>
+      )}
+    </div>
+  );
 }
 function ProposalCard({
   proposal,
@@ -613,13 +782,14 @@ function OfflineChat(props: ChatProps) {
   }
   return (
     <div className={`chat-thread ${active ? "has-messages" : "is-empty"}`}>
+      <TodayStrip entries={props.entries} canWrite={Boolean(props.session?.capabilities.write)} onEdit={props.onEdit} />
       <div className="chat-viewport" ref={viewport}>
         {active ? (
           <div className="conversation-column">
             <Proposals {...props} />
           </div>
         ) : (
-          <Welcome />
+          <Welcome session={props.session} />
         )}
       </div>
       <div className="chat-input-wrap">
@@ -728,6 +898,7 @@ function ConnectedChat(props: ChatProps) {
   const canSend = online && !waitingForApproval;
   const canSendRef = useRef(canSend);
   canSendRef.current = canSend;
+  const editingRef = useRef<string | null>(null);
   const runtime = useExternalStoreRuntime<UIMessage>({
     messages,
     isRunning: running,
@@ -750,7 +921,9 @@ function ConnectedChat(props: ChatProps) {
         return;
       }
       draftStore.clear();
-      await sendMessage({ text, metadata: { createdAt: Date.now() } });
+      const messageId = editingRef.current ?? undefined;
+      setEditing(null);
+      await sendMessage({ text, metadata: { createdAt: Date.now() }, ...(messageId ? { messageId } : {}) });
     },
     onCancel: async () => {
       await stop();
@@ -785,7 +958,23 @@ function ConnectedChat(props: ChatProps) {
   const timeline = useMemo(() => withDays(messages), [messages]);
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
   const canRetry = Boolean(error) && online && !running && messages.some((m) => m.role === "user");
-  let conversation: ReactNode = <Welcome />;
+  const lastUserId = [...messages].reverse().find((m) => m.role === "user")?.id;
+  const [editing, setEditing] = useState<string | null>(null);
+  editingRef.current = editing;
+  const busy = running || waitingForApproval || !online;
+  /** 换一种说法：只允许对最后一条回复，且该回复不含工具调用（否则会跳过已确认的写入语义）。 */
+  const canRegenerate = (m: UIMessage) =>
+    m.id === lastAssistantId && !m.parts.some((p) => isToolUIPart(p));
+  function startEdit(m: UIMessage) {
+    setEditing(m.id);
+    runtime.thread.composer.setText(textOf(m));
+    focusComposer();
+  }
+  function cancelEdit() {
+    setEditing(null);
+    runtime.thread.composer.setText("");
+  }
+  let conversation: ReactNode = <Welcome session={props.session} />;
   if (active)
     conversation = (
       <div className="conversation-column">
@@ -805,6 +994,7 @@ function ConnectedChat(props: ChatProps) {
                     </>
                   )}
                   <MessageStamp at={at} />
+                  {editing === message.id && <em className="message-editing">正在改这一条</em>}
                 </span>
                 {message.parts.map((part, i) =>
                   isToolUIPart(part) ? (
@@ -814,6 +1004,7 @@ function ConnectedChat(props: ChatProps) {
                       <Streamdown
                         isAnimating={streamingThis}
                         caret={streamingThis ? "block" : undefined}
+                        rehypePlugins={messageRehypePlugins}
                         controls={{ code: { copy: true, download: false }, table: { copy: true, download: false, fullscreen: false }, mermaid: false, image: false }}
                         linkSafety={{ enabled: false }}
                         translations={{ copyCode: "复制代码", copied: "已复制", copyTable: "复制表格" }}
@@ -822,6 +1013,15 @@ function ConnectedChat(props: ChatProps) {
                       </Streamdown>
                     </div>
                   ) : null,
+                )}
+                {!streamingThis && (
+                  <MessageActions
+                    message={message}
+                    disabled={busy}
+                    onEdit={message.role === "user" && message.id === lastUserId ? () => startEdit(message) : undefined}
+                    onRegenerate={message.role === "assistant" && canRegenerate(message) ? () => void regenerate() : undefined}
+                    onSaveNote={message.role === "assistant" ? () => props.onCreate("note", textOf(message), "莲花说") : undefined}
+                  />
                 )}
               </div>
             </div>
@@ -854,6 +1054,7 @@ function ConnectedChat(props: ChatProps) {
             </button>
           </div>
         )}
+        <TodayStrip entries={props.entries} canWrite={Boolean(props.session?.capabilities.write)} onEdit={props.onEdit} />
         <ThreadPrimitive.Viewport className="chat-viewport">
           {conversation}
           <ThreadPrimitive.ScrollToBottom className="scroll-to-latest" aria-label="回到最新消息">
@@ -870,6 +1071,14 @@ function ConnectedChat(props: ChatProps) {
                   重试回复
                 </button>
               )}
+            </p>
+          )}
+          {editing && (
+            <p className="chat-reconnecting chat-editing-bar" role="status">
+              改好后发送，莲花会从这一条重新回复；之后的对话会被替换。
+              <button type="button" className="text-link" onClick={cancelEdit}>
+                不改了
+              </button>
             </p>
           )}
           {waitingForApproval && !running && (

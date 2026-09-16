@@ -6,7 +6,7 @@ import { today } from "../lib/utils";
 import { Dialog } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { EntrySummary, kindInfo } from "./cards/EntryCard";
-export type EditorState = { kind: EntryKind; entry?: Entry; content?: string };
+export type EditorState = { kind: EntryKind; entry?: Entry; content?: string; title?: string };
 function beijingInput(iso: string) {
   const value = new Date(iso).getTime();
   return Number.isFinite(value) ? new Date(value + 8 * 3600000).toISOString().slice(0, 16) : "";
@@ -33,7 +33,7 @@ export function EntryDialog({
   const fieldId = useId();
   const [kind, setKind] = useState(editor.kind);
   const [title, setTitle] = useState(
-    editor.entry?.title || (editor.kind === "practice" ? "念佛" : ""),
+    editor.entry?.title || editor.title || (editor.kind === "practice" ? "念佛" : ""),
   );
   const [content, setContent] = useState(editor.entry?.content || editor.content || "");
   const [date, setDate] = useState(editor.entry?.date || today());
