@@ -38,6 +38,8 @@ import {
   MicrophoneIcon,
   PlayIcon,
   PauseIcon,
+  PhoneIcon,
+  SpeakerHighIcon,
 } from "@phosphor-icons/react";
 import { Button } from "../ui/button";
 import { Dialog } from "../ui/dialog";
@@ -53,6 +55,7 @@ import {
 } from "../../shared/contracts";
 import { useDraft } from "./useDraft";
 import { transcribeVoice, useVoiceRecorder, type VoiceRecorderState } from "./useVoiceRecorder";
+import { VoiceCall } from "./VoiceCall";
 
 type ChatProps = {
   initialPrompt: string;
@@ -336,7 +339,7 @@ function MessageStamp({ at }: { at: number | null }) {
 function voiceMeta(message: UIMessage): VoiceMeta | null {
   const voice = (message.metadata as { voice?: Partial<VoiceMeta> } | undefined)?.voice;
   if (!voice || typeof voice.durationMs !== "number") return null;
-  return { audioId: typeof voice.audioId === "string" ? voice.audioId : null, durationMs: voice.durationMs };
+  return { audioId: typeof voice.audioId === "string" ? voice.audioId : null, durationMs: voice.durationMs, call: voice.call === true };
 }
 const clipLength = (ms: number) => {
   const seconds = Math.max(1, Math.round(ms / 1000));
@@ -345,6 +348,14 @@ const clipLength = (ms: number) => {
 /** 可回放的语音气泡：音频是同源请求，自带登录 Cookie；没有 audioId（R2 未配置）时只显示时长。 */
 function VoiceClip({ meta }: { meta: VoiceMeta }) {
   const audio = useRef<HTMLAudioElement>(null);
+  if (meta.call) {
+    return (
+      <span className="voice-call-tag">
+        <PhoneIcon size={12} weight="fill" />
+        通话
+      </span>
+    );
+  }
   const [playing, setPlaying] = useState(false);
   const bars = useMemo(() => Array.from({ length: 14 }, (_, i) => 5 + ((i * 7) % 11)), []);
   function toggle() {
@@ -473,12 +484,16 @@ function MessageActions({
   onRegenerate,
   onEdit,
   onSaveNote,
+  onSpeak,
+  speaking,
 }: {
   message: UIMessage;
   disabled: boolean;
   onRegenerate?: () => void;
   onEdit?: () => void;
   onSaveNote?: () => void;
+  onSpeak?: () => void;
+  speaking?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const text = textOf(message);
@@ -514,6 +529,12 @@ function MessageActions({
         <button type="button" disabled={disabled} onClick={onSaveNote} aria-label="存为笔记">
           <BookmarkSimpleIcon size={14} />
           <span>存为笔记</span>
+        </button>
+      )}
+      {onSpeak && (
+        <button type="button" onClick={onSpeak} aria-label={speaking ? "停止朗读" : "朗读这段话"} aria-pressed={speaking}>
+          <SpeakerHighIcon size={14} weight={speaking ? "fill" : "regular"} />
+          <span>{speaking ? "朗读中…" : "朗读"}</span>
         </button>
       )}
     </div>
@@ -1049,6 +1070,7 @@ function ConnectedChat(props: ChatProps) {
   }, []);
   // 语音条：录完转写 → 走同一个 sendMessage；模型只看到文字，音频引用只挂在 metadata 里供回放。
   const voiceReady = Boolean(props.session?.capabilities.voice);
+  const speechReady = Boolean(props.session?.capabilities.speech);
   const [voiceError, setVoiceError] = useState("");
   const voice = useVoiceRecorder(
     async (clip) => {
@@ -1071,6 +1093,42 @@ function ConnectedChat(props: ChatProps) {
     },
     setVoiceError,
   );
+  // 实时通话弹窗；挂断后刷新一次，通话里生成的待确认记录会以卡片出现在对话里。
+  const [callOpen, setCallOpen] = useState(false);
+  // 朗读：只在用户点击时合成与播放；同一时间只放一段。
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const speaker = useRef<HTMLAudioElement | null>(null);
+  async function speak(message: UIMessage) {
+    const text = textOf(message);
+    if (!text) return;
+    if (speakingId === message.id) {
+      speaker.current?.pause();
+      setSpeakingId(null);
+      return;
+    }
+    setSpeakingId(message.id);
+    try {
+      const response = await fetch("/api/voice/speak", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.slice(0, 600) }),
+      });
+      if (!response.ok) throw new Error("朗读失败");
+      const url = URL.createObjectURL(await response.blob());
+      speaker.current?.pause();
+      const audio = new Audio(url);
+      speaker.current = audio;
+      audio.onended = audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        setSpeakingId((id) => (id === message.id ? null : id));
+      };
+      await audio.play();
+    } catch {
+      setVoiceError("这段话暂时没能朗读，请稍后再试。");
+      setSpeakingId(null);
+    }
+  }
   function select(text: string) {
     runtime.thread.composer.setText(text);
     focusComposer();
@@ -1135,7 +1193,7 @@ function ConnectedChat(props: ChatProps) {
                   <MessageStamp at={at} />
                   {editing === message.id && <em className="message-editing">正在改这一条</em>}
                 </span>
-                {message.role === "user" && voiceMeta(message) && <VoiceClip meta={voiceMeta(message)!} />}
+                {voiceMeta(message) && (message.role === "user" || voiceMeta(message)!.call) && <VoiceClip meta={voiceMeta(message)!} />}
                 {message.parts.map((part, i) =>
                   isToolUIPart(part) ? (
                     <ToolCard key={i} part={part} entries={props.entries} onApproval={approve} />
@@ -1161,6 +1219,8 @@ function ConnectedChat(props: ChatProps) {
                     onEdit={message.role === "user" && message.id === lastUserId ? () => startEdit(message) : undefined}
                     onRegenerate={message.role === "assistant" && canRegenerate(message) ? () => void regenerate() : undefined}
                     onSaveNote={message.role === "assistant" ? () => props.onCreate("note", textOf(message), "小莲说") : undefined}
+                    onSpeak={message.role === "assistant" && speechReady ? () => void speak(message) : undefined}
+                    speaking={speakingId === message.id}
                   />
                 )}
               </div>
@@ -1285,6 +1345,18 @@ function ConnectedChat(props: ChatProps) {
                   onCancel={voice.cancel}
                 />
               )}
+              {voiceReady && speechReady && (
+                <button
+                  type="button"
+                  className="composer-call"
+                  disabled={!canSend || running}
+                  aria-label="和小莲通话"
+                  title="和小莲通话"
+                  onClick={() => setCallOpen(true)}
+                >
+                  <PhoneIcon size={19} />
+                </button>
+              )}
               <span className="composer-mode">
                 <LotusMark size={15} />
                 小莲伴修
@@ -1312,6 +1384,13 @@ function ConnectedChat(props: ChatProps) {
         </div>
         {!active && <div className="chat-bottom-note">日常有安放，念念有归处。</div>}
       </ThreadPrimitive.Root>
+      <VoiceCall
+        open={callOpen}
+        onClose={() => {
+          setCallOpen(false);
+          props.onRefresh();
+        }}
+      />
       <Dialog
         open={confirmClear}
         onOpenChange={setConfirmClear}

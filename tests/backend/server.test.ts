@@ -122,11 +122,23 @@ describe("connected socket authorization and native decision boundary", () => {
     const {agent, connection, sqlite} = await connected();
     try {
       connection.state = {accountId: "trusted-account", verifiedAt: Date.now() - 31 * 60 * 1000};
+      // 音频帧过门禁后由 withVoice 混入吞掉（进通话缓冲），不会到聊天 SDK，也不会被当成过期连接关掉。
       await agent.onMessage(connection, new ArrayBuffer(8));
-      expect(gateway.sdkOnMessage).toHaveBeenCalledOnce();
+      expect(connection.close).not.toHaveBeenCalled();
+      expect(gateway.sdkOnMessage).not.toHaveBeenCalled();
       await agent.onMessage(connection, JSON.stringify({type: "cf_agent_chat_clear"}));
       expect(connection.close).toHaveBeenCalledWith(RECONNECT_CODE, expect.any(String));
-      expect(gateway.sdkOnMessage).toHaveBeenCalledOnce();
+      expect(gateway.sdkOnMessage).not.toHaveBeenCalled();
+    } finally { sqlite.close(); }
+  });
+  it("refuses to start a call on a connection that never passed the handshake, and only then", async () => {
+    const {agent, connection, sqlite} = await connected();
+    try {
+      (agent as unknown as { env: object }).env = { ...(env as object), AI: {}, OPENAI_BASE_URL: "https://api.siliconflow.cn/v1" }; // 通话需要识别 + 朗读都配好
+      expect(agent.beforeCallStart(connection as never)).toBe(true);
+      connection.state = null;
+      expect(agent.beforeCallStart(connection as never)).toBe(false);
+      expect(connection.send).toHaveBeenCalledWith(expect.stringContaining("\"type\":\"error\""));
     } finally { sqlite.close(); }
   });
 });

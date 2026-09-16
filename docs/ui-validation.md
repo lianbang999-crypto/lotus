@@ -165,3 +165,21 @@ WRANGLER_LOG_PATH=/tmp/lotus-chat-ui-wrangler.log npx vite --config tests/backen
 - 单测：`server.test.ts` 三个连接测试改写为「握手验一次且附件里不含凭据 / 三种非法会话握手即关且之后任何帧不达 SDK / TTL 后文本帧 4409、二进制帧放行」；110 项全过。`tsc` / `oxlint` / 生产构建 / `wrangler deploy --dry-run` 通过（上传 2599 → 3142 KiB，`agents` 0.23 更大）。
 
 **未验**：4409 重连路径没有在浏览器里等 30 分钟实测，只有单测覆盖服务端与一行客户端逻辑；线上迁移未做。
+
+## 2026-09-16 实时通话 + 语音朗读（阶段 4）
+
+**做了什么**：`LotusAgent` 改为 `withVoice(AIChatAgent)`；文字与通话共用一个 `turn()`（同一系统提示、近况、工具）；通话模式的写入工具改调 `store.createProposal`，小莲口头说「已放到对话里，挂断后点一下确认」；每轮通话的转写与回复用 `persistMessages` 并回聊天线程（标「通话」，不触发新回复）；语音客户端走自定义 `VoiceTransport`（普通 WebSocket 连 `/api/agent`，同一条握手鉴权，`/agents/*` 仍 404）；`beforeCallStart` 再核连接状态与识别/朗读/模型配置。朗读：助手消息「朗读」键 → `POST /api/voice/speak` → 按账号 + 文本哈希缓存 R2，只在点击时出声。
+
+**中文 TTS spike（如实记录）**：
+- Workers AI `@cf/myshell-ai/melotts` 传 `lang: "zh"` 能返回 200（44.1 kHz WAV，不是文档说的 mp3），冷启动时一串请求前几条秒回 500（AiError 3043）。但把它的输出喂回 Whisper，在 8 种采样率/声道解释下都听不出一个字（「安康安康…」「昂昂昂…」），能量分布像语音但内容不可辨；未经人耳复核，按 Whisper 判定为**不可用**，已删除相关代码。
+- SiliconFlow `FunAudioLLM/CosyVoice2-0.5B`（`OPENAI_BASE_URL` 已指向它，同一把 key）：普通话女声 claire，mp3 24 kHz，20 字约 1 秒；喂回 Whisper 逐字还原「南无阿弥陀佛,今天念佛五百声,心里很平静。」→ **采用**。`capabilities.speech` 只在 `OPENAI_BASE_URL` 是 `api.siliconflow.cn` 时为 true，否则朗读 503、通话不开放。
+
+**识别（STT）**：`WorkersAINova3STT({ language: "zh" })` 在本地 dev 起不来——远程 AI 绑定不走 WebSocket（`did not return a WebSocket`），`wrangler dev --remote` 又没有本地登录身份。于是 `agent/stt.ts` 做了 `LotusTranscriber`：先试 Nova-3，`waitUntilReady` 失败就退到「能量 VAD + Whisper 分段识别」（没有中间结果，说完一句才出字），建立阶段收到的音频缓存后补喂，不丢开头。**Nova-3 流式路径要上线后才能验，本地只验证了退路。**
+
+**浏览器证据**（`bash tests/browser/call-flow.sh`，假麦克风、真 Whisper / DeepSeek-V3 / CosyVoice2，1280×800）：
+- 「今天念佛五百声，心里很平静。」→ 识别「今天念佛五百声,心里很平静」→ 状态 listening → thinking → speaking → listening（朗读真的放了）→ 挂断后聊天线程多出 2 条带「通话」标记的消息。
+- `TEXT="帮我记一下，今天念佛五百声。"` → 服务端日志 `[turn:voice] 工具调用 recordPractice`（第一次入参未过校验，模型自行重试一次）→ 待确认提案 0 → 1，**没有直接落库** → 挂断后对话里出现「你填写的记录 · 等待你确认 · 念佛 500 声」卡片 → 「朗读」键：朗读中… → 播完复位。
+- 390×844：通话页为居中弹层，状态、转写、静音/挂断都在首屏（`output/playwright/call-mobile.png`）。
+- 单元：`tests/backend/{stt,tts,voice,server,tools}.test.ts` 共 122 例通过；`tsc`、`oxlint`、`vite build`、`wrangler deploy --dry-run` 通过。
+
+**未做 / 待上线验**：Nova-3 流式识别；iPhone 微信内置浏览器与安卓 Chrome 真机（要 HTTPS 与真麦克风，本地没做）；通话里 TTS 与麦克风的回声抑制只靠浏览器默认；模型偶尔在通话里说「功德无量」之类的评价语，已在通话提示里明确禁止，但属模型行为，非代码保证；`persistMessages` 并回聊天的做法依赖 ai-chat 0.12 的内部约定（只落库 + 广播，不触发 `onChatMessage`），升级时复核。

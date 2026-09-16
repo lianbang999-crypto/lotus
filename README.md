@@ -37,6 +37,8 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 - 聊天回复的 Markdown 由 Streamdown 渲染，但**不启用 `rehype-raw`**：模型输出的原始 HTML 以纯文本显示而非进入 DOM。这既是安全边界，也让首屏分包省掉 parse5（Chat 分包 909→739 kB，gzip 266→214）。约束由 `src/lib/rehype-raw-stub.ts`、`vite.config.ts` 的 alias 与 `tests/backend/markdown-safety.test.ts` 三处共同保证，改动前请先看该测试的注释。
 - **三套主题**（2026-09-16）：苔绿（小莲本色）、朝霞（活泼）、素纸（极简、宋体）。设置弹窗里切换，记在 `localStorage`，首屏前内联脚本设 `data-theme` 不闪屏。改色只改 `styles.css` 顶部的 token 块。
 - **语音条**（2026-09-16）：输入框旁「按住说话」，松开即发、上滑取消。客户端把录音重采样成 16 kHz WAV 上传，服务端用 Workers AI `whisper-large-v3-turbo`（`language: zh`）转写，原音按账号前缀存 R2 供回放（支持 Range）。**模型只看到转写文字**，走同一个 `sendMessage`，工具与确认卡一行不动；想改转写用「改一改」。
+- **语音朗读**（2026-09-16）：助手消息上的「朗读」键，只在点击时出声。中文 TTS 用 SiliconFlow `FunAudioLLM/CosyVoice2-0.5B`（`OPENAI_BASE_URL` 指向 SiliconFlow 时自动启用，`capabilities.speech`）；按账号 + 文本哈希缓存在 R2。Workers AI melotts 的中文输出经 Whisper 回听不可辨，已弃用（记录见 `docs/ui-validation.md`）。
+- **实时通话**（2026-09-16）：输入框的电话键，`agents@0.23` 的 `withVoice` 混入；识别先试 `WorkersAINova3STT({ language: "zh" })`，起不来退到「能量 VAD + Whisper 分段」；通话与文字共用同一颗脑子（系统提示、近况、工具），**通话里的写入工具只生成待确认提案**，挂断后回对话里点确认；每轮转写与回复并回聊天线程并标「通话」。语音 WebSocket 走同一条 `/api/agent` 握手鉴权，`/agents/*` 仍不开放；小莲不主动呼叫。
 
 ## UI/UX 技术栈（真实在用）
 
@@ -54,7 +56,9 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 | 样式工具 | `clsx` + `tailwind-merge` + `class-variance-authority` | · MIT / Apache-2.0 | shadcn 式 `cn()` 与 Button 变体 |
 | 日历 | [Schedule-X](https://schedule-x.dev/) | 4.8.0 · MIT | 月视图 / 议程视图（抽屉内，懒加载） |
 | 热力图 | [cal-heatmap](https://cal-heatmap.com/) | 4.2.4 · MIT | 功课与省察足迹（抽屉内，懒加载） |
-| 语音转写 | Workers AI `@cf/openai/whisper-large-v3-turbo` + R2 | 平台服务 · $0.000513/分钟 | 语音条转写与原音回放；`wrangler.jsonc` 的 `ai` / `r2_buckets` 绑定，本地开发 AI 走 `remote: true` |
+| 语音转写 | Workers AI `@cf/openai/whisper-large-v3-turbo` + R2 | 平台服务 · $0.000513/分钟 | 语音条转写与原音回放；通话里 Nova-3 不可用时的分段识别退路；`wrangler.jsonc` 的 `ai` / `r2_buckets` 绑定，本地开发 AI 走 `remote: true` |
+| 实时通话 | `agents/voice`（`withVoice`、`WorkersAINova3STT`、`useVoiceAgent`） | 0.23.0 · MIT | 通话协议、客户端 VAD/打断/播放；STT `@cf/deepgram/nova-3`（本地 dev 起不来，线上待验） |
+| 中文朗读 | SiliconFlow `FunAudioLLM/CosyVoice2-0.5B`（OpenAI 兼容 `/audio/speech`） | 按量计费 | 朗读键与通话回声；`src/agent/tts.ts`，密钥只在服务端 |
 
 **只是设计参考、未引入代码**：Zola（布局）、prompt-kit（`full-chat-app` 区块的侧栏 + 消息流 + 输入框动作行骨架，2026-09-16 起按此结构自建）、Haven（陪伴感）、以及 AIRI / KouriChat / Everthine / SillyTavern / EverOtome 等陪伴类项目的交互取舍，分别见 [设计调研](docs/design-references.md) 与 [陪伴类项目调研](docs/companion-references.md)。
 

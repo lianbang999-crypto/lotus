@@ -3796,3 +3796,129 @@ button svg {
 .sidebar-static .sidebar-scroll {
   mask-image: linear-gradient(to bottom, black calc(100% - 22px), transparent);
 }
+
+/* ===== 实时通话 + 朗读 ===== */
+.composer-call {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-faint);
+  border: 1px solid var(--muted);
+  background: var(--white);
+  transition: background 0.18s, color 0.18s;
+}
+.composer-call:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--brand-strong);
+}
+.composer-call:disabled {
+  opacity: 0.45;
+}
+.voice-call {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 0 2px;
+  text-align: center;
+}
+.voice-call-mark {
+  --level: 0;
+  width: 112px;
+  height: 112px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--brand);
+  background: var(--surface);
+  border: 1px solid var(--muted);
+  box-shadow: 0 0 0 calc(6px + var(--level) * 22px) color-mix(in srgb, var(--brand) calc(10% + var(--level) * 25%), transparent);
+  transition: box-shadow 0.12s linear;
+}
+.voice-call[data-status="speaking"] .voice-call-mark {
+  animation: voice-breathe 1.6s ease-in-out infinite;
+}
+.voice-call[data-status="thinking"] .voice-call-mark {
+  color: var(--ink-faint);
+}
+@keyframes voice-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+.voice-call-status {
+  font-size: 13px;
+  color: var(--ink-muted);
+  min-height: 1.4em;
+}
+.voice-call-transcript {
+  width: 100%;
+  min-height: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.voice-line {
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 6px 12px;
+  border-radius: 10px;
+  max-width: 92%;
+}
+.voice-line-user {
+  align-self: flex-end;
+  background: var(--surface-2);
+  color: var(--ink-soft);
+}
+.voice-line-assistant {
+  align-self: flex-start;
+  background: var(--white);
+  border: 1px solid var(--muted);
+  color: var(--ink-soft);
+}
+.voice-line.is-interim {
+  opacity: 0.55;
+}
+.voice-call-actions {
+  display: flex;
+  gap: 18px;
+  margin-top: 4px;
+}
+.voice-call-button {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  border: 1px solid var(--muted);
+}
+.voice-call-button[aria-pressed="true"] {
+  background: var(--muted);
+}
+.voice-call-button.is-hangup {
+  background: var(--danger);
+  color: var(--brand-fg);
+  border-color: var(--danger);
+}
+.voice-call-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--ink-faint);
+  border: 1px solid var(--muted);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-bottom: 4px;
+}
+.message-user .voice-call-tag {
+  margin-left: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-call[data-status="speaking"] .voice-call-mark { animation: none; }
+  .voice-call-mark { transition: none; }
+}

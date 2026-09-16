@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const gateway = vi.hoisted(() => ({ resolveSession: vi.fn(), getAgentByName: vi.fn() }));
 vi.mock("agents", () => ({ getAgentByName: gateway.getAgentByName }));
 vi.mock("@cloudflare/ai-chat", () => ({ AIChatAgent: class { constructor(public ctx: unknown, public env: unknown) {} onMessage = vi.fn(); } }));
@@ -22,7 +22,8 @@ const post = (bytes: Uint8Array<ArrayBuffer>, headers: Record<string, string> = 
   new Request(`${origin}/api/voice/transcribe`, { method: "POST", headers: { Origin: origin, "Content-Type": "audio/wav", ...headers }, body: bytes });
 const ai = { run: vi.fn() };
 const r2 = { put: vi.fn(), get: vi.fn() };
-const env = { LotusAgent: {}, OPENAI_API_KEY: "fixture-model-key", MODEL_NAME: "test", DEV_LOCAL: "false", AI: ai, VOICE_AUDIO: r2 } as never;
+const env = { LotusAgent: {}, OPENAI_API_KEY: "fixture-model-key", OPENAI_BASE_URL: "https://api.siliconflow.cn/v1", MODEL_NAME: "test", DEV_LOCAL: "false", AI: ai, VOICE_AUDIO: r2 } as never;
+const mp3 = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
 const without = (key: "AI" | "VOICE_AUDIO") => ({ ...(env as Record<string, unknown>), [key]: undefined }) as never;
 
 beforeEach(() => {
@@ -30,6 +31,7 @@ beforeEach(() => {
   gateway.resolveSession.mockResolvedValue({ accountId: "trusted-account", name: "佛友", isAnonymous: false, mode: "cloud" });
   ai.run.mockResolvedValue({ text: " 今天念佛五百声 " });
 });
+afterEach(() => vi.unstubAllGlobals());
 
 describe("wavDurationMs", () => {
   it("derives duration from the canonical header and rejects anything else", () => {
@@ -41,10 +43,13 @@ describe("wavDurationMs", () => {
 
 describe("voice transcribe", () => {
   it("advertises voice only for writable sessions with Workers AI bound", async () => {
-    const withAI = await (await worker.fetch(new Request(`${origin}/api/session`), env)).json() as { capabilities: { voice: boolean } };
-    expect(withAI.capabilities.voice).toBe(true);
-    const noAI = await (await worker.fetch(new Request(`${origin}/api/session`), without("AI"))).json() as { capabilities: { voice: boolean } };
-    expect(noAI.capabilities.voice).toBe(false);
+    type Caps = { capabilities: { voice: boolean; speech: boolean } };
+    const withAI = await (await worker.fetch(new Request(`${origin}/api/session`), env)).json() as Caps;
+    expect(withAI.capabilities).toMatchObject({ voice: true, speech: true });
+    const noAI = await (await worker.fetch(new Request(`${origin}/api/session`), without("AI"))).json() as Caps;
+    expect(noAI.capabilities).toMatchObject({ voice: false, speech: true }); // 朗读走 SiliconFlow，不依赖 Workers AI
+    const noTTS = await (await worker.fetch(new Request(`${origin}/api/session`), { ...(env as object), OPENAI_BASE_URL: undefined } as never)).json() as Caps;
+    expect(noTTS.capabilities).toMatchObject({ voice: true, speech: false });
   });
   it("requires a real session and the same origin before touching the model", async () => {
     gateway.resolveSession.mockResolvedValueOnce(null);
@@ -79,6 +84,47 @@ describe("voice transcribe", () => {
   it("refuses when Workers AI is not bound", async () => {
     expect((await worker.fetch(post(wav(1)), without("AI"))).status).toBe(503);
     expect(ai.run).not.toHaveBeenCalled();
+  });
+});
+
+describe("voice speak (朗读)", () => {
+  const speak = (body: unknown, target = env) => worker.fetch(new Request(`${origin}/api/voice/speak`, { method: "POST", headers: { Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify(body) }), target);
+  it("synthesizes Mandarin through CosyVoice2 with the server-side key, sniffs the format and caches under the account prefix", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(mp3, { headers: { "content-type": "audio/mpeg" } })); vi.stubGlobal("fetch", fetcher);
+    r2.get.mockResolvedValueOnce(null);
+    const response = await speak({ text: "阿弥陀佛" });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("audio/mpeg");
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(mp3);
+    const [url, init] = fetcher.mock.calls[0];
+    expect(String(url)).toBe("https://api.siliconflow.cn/v1/audio/speech");
+    expect(init.headers.Authorization).toBe("Bearer fixture-model-key");
+    expect(JSON.parse(init.body)).toMatchObject({ model: "FunAudioLLM/CosyVoice2-0.5B", input: "阿弥陀佛", response_format: "mp3" });
+    expect(ai.run).not.toHaveBeenCalled();
+    expect(r2.put).toHaveBeenCalledWith(expect.stringMatching(/^voice\/trusted-account\/tts\/[0-9a-f]{64}$/), expect.any(ArrayBuffer), expect.objectContaining({ httpMetadata: { contentType: "audio/mpeg" } }));
+  });
+  it("serves a cached clip with its stored type without calling upstream", async () => {
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    r2.get.mockResolvedValueOnce({ body: "cached", httpMetadata: { contentType: "audio/wav" } });
+    const response = await speak({ text: "阿弥陀佛" });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("audio/wav");
+    expect(response.headers.get("X-Voice-Cache")).toBe("hit");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("rejects empty or overlong text, reports missing configuration and upstream failure honestly", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response("sensitive upstream error", { status: 500 })); vi.stubGlobal("fetch", fetcher);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect((await speak({ text: "   " })).status).toBe(400);
+    expect((await speak({ text: "阿".repeat(601) })).status).toBe(413);
+    expect((await speak({ text: "你好" }, { ...(env as object), OPENAI_BASE_URL: undefined } as never)).status).toBe(503);
+    expect(fetcher).not.toHaveBeenCalled();
+    r2.get.mockResolvedValueOnce(null);
+    const failed = await speak({ text: "你好" });
+    expect(failed.status).toBe(502);
+    expect(await failed.text()).not.toContain("sensitive");
+    expect(r2.put).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
 

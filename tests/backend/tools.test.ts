@@ -18,7 +18,21 @@ it("every personal mutation unconditionally asks approval, and note execution is
     expect(store.list()).toHaveLength(1);
   } finally { sqlite.close(); }
 });
-const passage = { n: 1, id: "yg#1", aid: "yg", title: "文钞", text: "测试夹具原文", context: "", url: "https://wenchao.foyue.org/?id=yg", vol: "", volName: "", sourceType: "letter", corpus: "yinguang", role: "basis", score: 0.5 };
+// 通话模式：确认卡渲染不出来，写入工具改为创建待确认提案；仍然不直接写库，仍然要用户点确认。
+it("voice mode turns every mutation into a pending proposal instead of writing", async () => {
+  const {store, sqlite} = sqliteStore();
+  try {
+    const tools = createLotusTools(store, {}, { mode: "voice" });
+    for (const name of ["saveNote", "writeDiary", "recordMerit", "recordLedger", "recordPractice", "createSchedule", "updateEntry", "deleteEntry"] as const) expect(tools[name].needsApproval).toBeUndefined();
+    const result = await tools.saveNote.execute!(note, options) as { ok: boolean; pending?: boolean; proposalId?: string; message?: string };
+    expect(result).toMatchObject({ ok: true, pending: true, message: expect.stringContaining("确认") });
+    expect(store.list()).toEqual([]);
+    expect(store.proposals().map((p) => p.id)).toContain(result.proposalId);
+    expect(await tools.deleteEntry.execute!({ entryId: "missing", entryTitle: "x", expectedVersion: 1 }, options)).toMatchObject({ ok: false });
+    expect(store.proposals()).toHaveLength(1);
+  } finally { sqlite.close(); }
+});
+const passage ={ n: 1, id: "yg#1", aid: "yg", title: "文钞", text: "测试夹具原文", context: "", url: "https://wenchao.foyue.org/?id=yg", vol: "", volName: "", sourceType: "letter", corpus: "yinguang", role: "basis", score: 0.5 };
 const response = () => ({ok: true, query: "信愿", passages: [{...passage}], sources: [{ id: "yg", title: "文钞", url: passage.url, corpus: "yinguang", role: "basis" }], retrieval: { version: "lotus-r1", mode: "hybrid", corpora: ["yinguang", "daan"], warnings: [], unavailableCorpora: [], rewritten: false } });
 const env = { WENCHAO_API_URL: "https://wenchao.foyue.org/api/retrieve", WENCHAO_API_KEY: "fixture-test-key" };
 const input = { query: "信愿", corpora: ["yinguang", "daan"] as ("yinguang" | "daan")[], topK: 5 };

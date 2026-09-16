@@ -50,8 +50,8 @@
 | 形态 | 做法 | 写入怎么确认 |
 | --- | --- | --- |
 | **语音条**（按住说话、发出去、可回放、附转写） | 录音 → 客户端转 16 kHz WAV → Workers AI `whisper-large-v3-turbo`（`language: "zh"`）转写 → 走现有 `sendMessage`，原音存 R2 | 模型只看到转写文字，工具与确认卡一行不动 |
-| **语音朗读**（小莲把回答念出来） | 助手消息上的「播放」键 → 中文 TTS → mp3，按消息缓存 | **只在用户点击时出声**，绝不自动 |
-| **实时通话** | `agents@0.23` 的 `withVoice` 混入；STT 用 `WorkersAINova3STT({ language: "zh" })`（默认的 Flux 无中文）；TTS 需自写一个小 provider（melotts `zh` 待验，备选 SiliconFlow CosyVoice2 / ElevenLabs） | 通话里的写入工具不直接写库，改调现有 `createProposal`，小莲口头说「已放到对话里等你确认」，确认卡出现在聊天线程——**每笔写入仍由用户点按确认**。这就是原先「通话里审批无法安全表达」那条反对理由的答案 |
+| **语音朗读**（小莲把回答念出来） | 助手消息上的「朗读」键 → SiliconFlow CosyVoice2（melotts 中文经 Whisper 回听不可辨，已弃） → mp3，按账号 + 文本哈希缓存 R2 | **只在用户点击时出声**，绝不自动 |
+| **实时通话** | `agents@0.23` 的 `withVoice` 混入；STT 用 `WorkersAINova3STT({ language: "zh" })`（默认的 Flux 无中文）；TTS 自写 provider 调 SiliconFlow CosyVoice2；Nova-3 起不来退到 Whisper 分段识别 | 通话里的写入工具不直接写库，改调现有 `createProposal`，小莲口头说「已放到对话里等你确认」，确认卡出现在聊天线程——**每笔写入仍由用户点按确认**。这就是原先「通话里审批无法安全表达」那条反对理由的答案 |
 
 原先反对实时通话的另一条理由「制造对方在线等你的压力」仍然成立，所以通话必须由用户发起、随时可挂断，小莲不主动呼叫。
 

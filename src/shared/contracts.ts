@@ -39,9 +39,14 @@ export type SessionInfo = {
   authenticated: boolean;
   user: { accountId: string; name: string; isAnonymous: boolean } | null;
   mode: "cloud" | "local" | "unconfigured";
-  capabilities: { chat: boolean; entries: boolean; write: boolean; dharma: boolean; voice: boolean; reminders: "in_app" };
+  capabilities: { chat: boolean; entries: boolean; write: boolean; dharma: boolean; voice: boolean;
+    /** 语音朗读 / 通话回声：中文 TTS（SiliconFlow CosyVoice2）已配置。通话同时需要 voice。 */
+    speech: boolean; reminders: "in_app" };
   message?: string;
 };
-/** 语音条：挂在用户消息 metadata.voice 上；模型只看到转写文字，音频只用于回放。 */
-export type VoiceMeta = { audioId: string | null; durationMs: number };
+/**
+ * 语音条：挂在消息 metadata.voice 上；模型只看到转写文字，音频只用于回放。
+ * call: true 表示这条来自实时通话（转写并回聊天线程），没有可回放的音频，只显示「通话」标记。
+ */
+export type VoiceMeta = { audioId: string | null; durationMs: number; call?: boolean };
 export type APIError = { error: string; message: string };
