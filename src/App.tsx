@@ -67,13 +67,13 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [prompt, setPrompt] = useState("");
   const [theme, setTheme] = useState<ThemeId>(readTheme);
-  // 桌面常驻侧栏：折叠状态记住；手机仍是抽屉
+  // 桌面侧栏：默认收起，聊天页第一眼只有对话。展开过就记住，手机仍是抽屉。
   const desktop = useMediaQuery("(min-width: 901px)");
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try {
-      return localStorage.getItem("lotus:sidebar") !== "closed";
+      return localStorage.getItem("lotus:sidebar") === "open";
     } catch {
-      return true;
+      return false;
     }
   });
   function toggleSidebar() {
@@ -283,7 +283,6 @@ export default function App() {
                   <span>{nav.find((n) => n.id === page)?.label || "法义文库"}</span>
                 </>
               )}
-              {page === "chat" && <span className="chat-top-label">净土伴修</span>}
             </div>
             <div className="topbar-actions">
               {pending.length > 0 && (
@@ -292,22 +291,21 @@ export default function App() {
                   <span>{pending.length} 条待确认</span>
                 </button>
               )}
-              <button className="private-indicator" onClick={() => setSettings(true)}>
-                <span />
-                {session?.capabilities.chat
-                  ? "AI 已配置"
-                  : session?.authenticated
-                    ? "AI 尚未连接"
-                    : "登录后开始"}
-              </button>
+              {/* 一切正常时不提示——常驻的「已配置」没有信息量。只有需要你动手时才出现。
+                  正常状态想进设置，走侧栏底部的齿轮。 */}
+              {!session?.capabilities.chat && (
+                <button className="private-indicator" onClick={() => setSettings(true)}>
+                  <span />
+                  {session?.authenticated ? "AI 尚未连接" : "登录后开始"}
+                </button>
+              )}
             </div>
           </header>
-          {session?.mode === "local" && (
+          {/* 本地模式一切就绪时不再占一整行：「记录保存在本机」侧栏账号区已经写着了。
+              只有语言模型没接上、需要引导另一条路时才提示。 */}
+          {session?.mode === "local" && !session.capabilities.chat && (
             <div className="mode-banner">
-              <span>本地开发</span>记录保存在本机
-              {session.capabilities.chat
-                ? "，已配置语言模型。"
-                : "，可通过输入框旁的「＋」体验记录与确认。"}
+              <span>本地开发</span>记录保存在本机，可通过输入框旁的「＋」体验记录与确认。
             </div>
           )}
           {error && (

@@ -85,6 +85,8 @@ export function useVoiceRecorder(
 ) {
   const [state, setState] = useState<VoiceRecorderState>("idle");
   const [elapsedMs, setElapsedMs] = useState(0);
+  // 录音期间把麦克风流借给波形组件做可视化，省掉它再申请一次授权。
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const stateRef = useRef<VoiceRecorderState>("idle");
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
@@ -122,6 +124,7 @@ export function useVoiceRecorder(
     clearTicker();
     const active = recorder.current;
     recorder.current = null;
+    setStream(null); // 先撤掉可视化的引用，再关轨道
     active?.stream.getTracks().forEach((track) => track.stop());
     const parts = chunks.current;
     chunks.current = [];
@@ -168,6 +171,7 @@ export function useVoiceRecorder(
       startedAt.current = Date.now();
       active.start(250);
       setPhase("recording");
+      setStream(stream);
       setElapsedMs(0);
       ticker.current = window.setInterval(() => {
         const elapsed = Date.now() - startedAt.current;
@@ -194,5 +198,5 @@ export function useVoiceRecorder(
     [],
   );
 
-  return { state, elapsedMs, start, stop, cancel };
+  return { state, elapsedMs, stream, start, stop, cancel };
 }

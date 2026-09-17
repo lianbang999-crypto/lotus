@@ -43,6 +43,9 @@ import {
 } from "@phosphor-icons/react";
 import { Button } from "../ui/button";
 import { Dialog } from "../ui/dialog";
+import { AudioScrubber } from "../ui/waveform";
+import { LiveWaveform } from "../ui/live-waveform";
+import { useAudioPeaks } from "./useAudioPeaks";
 import { LotusMark } from "../LotusMark";
 import { EntrySummary, kindInfo } from "../cards/EntryCard";
 import {
@@ -134,7 +137,8 @@ function Welcome({ session }: { session: SessionInfo | null }) {
       <div className="welcome-lotus">
         <LotusMark size={57} />
       </div>
-      <span className="welcome-overline">小莲 · 你的净土伴修助手</span>
+      {/* 原来这里还有一行「小莲 · 你的净土伴修助手」。顶栏的品牌、这朵莲花、
+          下面的问候已经把"这是谁"说了三遍，留问候本身就够。 */}
       <h1>
         <span className="welcome-first-line">
           {word}
@@ -167,7 +171,11 @@ const dayKey = (at: number | string | Date) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(at));
 const clock = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 /** 今天到期、尚未完成的日程，直接放进对话入口——这是产品承诺的“应用内到期提示”。 */
-function TodayStrip({ entries, canWrite, onEdit }: { entries: Entry[]; canWrite: boolean; onEdit: (entry: Entry) => void }) {
+/**
+ * 今天未完成的日程条。已从聊天页撤下——聊天页只留对话。
+ * 组件本身保留并导出，等「我的记录 / 每日功课」合并成统一页面时直接挂过去。
+ */
+export function TodayStrip({ entries, canWrite, onEdit }: { entries: Entry[]; canWrite: boolean; onEdit: (entry: Entry) => void }) {
   const today = dayKey(Date.now());
   const key = `lotus:today-dismissed:${today}`;
   const [dismissed, setDismissed] = useState(() => {
@@ -345,9 +353,15 @@ const clipLength = (ms: number) => {
   const seconds = Math.max(1, Math.round(ms / 1000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 };
+/**
+ * 波形没解码出来时的占位条。必须是确定性的：AudioScrubber 自带的 fallback 每次渲染
+ * 都重新随机，播放中 onTimeUpdate 每秒触发数次重渲染，那条波形会一直抖。
+ */
+const VOICE_PLACEHOLDER = Array.from({ length: 48 }, (_, i) => 0.25 + ((i * 7) % 11) / 22);
+
 /** 可回放的语音气泡：音频是同源请求，自带登录 Cookie；没有 audioId（R2 未配置）时只显示时长。 */
 function VoiceClip({ meta }: { meta: VoiceMeta }) {
-  const audio = useRef<HTMLAudioElement>(null);
+  // 通话只是一个标记，没有可回放的音频。单独分支，免得播放器那几个 hook 被条件调用。
   if (meta.call) {
     return (
       <span className="voice-call-tag">
@@ -356,14 +370,30 @@ function VoiceClip({ meta }: { meta: VoiceMeta }) {
       </span>
     );
   }
+  return <VoicePlayer meta={meta} />;
+}
+
+function VoicePlayer({ meta }: { meta: VoiceMeta }) {
+  const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
-  const bars = useMemo(() => Array.from({ length: 14 }, (_, i) => 5 + ((i * 7) % 11)), []);
+  const [at, setAt] = useState(0);
+  const { peaks, load } = useAudioPeaks(meta.audioId);
+  const seconds = Math.max(1, meta.durationMs / 1000);
+
   function toggle() {
     const element = audio.current;
     if (!element) return;
+    load(); // 第一次播放才去解码波形，气泡本身保持 preload="none"
     if (element.paused) void element.play().catch(() => setPlaying(false));
     else element.pause();
   }
+  function seek(time: number) {
+    const element = audio.current;
+    if (!element) return;
+    element.currentTime = time;
+    setAt(time);
+  }
+
   return (
     <span className="voice-clip">
       {meta.audioId && (
@@ -377,15 +407,26 @@ function VoiceClip({ meta }: { meta: VoiceMeta }) {
             preload="none"
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
+            onEnded={() => {
+              setPlaying(false);
+              setAt(0);
+            }}
+            onTimeUpdate={(event) => setAt(event.currentTarget.currentTime)}
           />
         </>
       )}
-      <span className="voice-bars" aria-hidden="true">
-        {bars.map((height, i) => (
-          <i key={i} style={{ height }} />
-        ))}
-      </span>
+      <AudioScrubber
+        className="voice-wave"
+        data={peaks ?? VOICE_PLACEHOLDER}
+        currentTime={at}
+        duration={seconds}
+        onSeek={meta.audioId ? seek : undefined}
+        barWidth={2}
+        barGap={1}
+        barRadius={1}
+        height={26}
+        showHandle={false}
+      />
       <time>{clipLength(meta.durationMs)}</time>
     </span>
   );
@@ -917,7 +958,6 @@ function OfflineChat(props: ChatProps) {
   }
   return (
     <div className={`chat-thread ${active ? "has-messages" : "is-empty"}`}>
-      <TodayStrip entries={props.entries} canWrite={Boolean(props.session?.capabilities.write)} onEdit={props.onEdit} />
       <div className="chat-viewport" ref={viewport}>
         {active ? (
           <div className="conversation-column">
@@ -952,10 +992,6 @@ function OfflineChat(props: ChatProps) {
           />
           <div className="agent-composer-toolbar">
             <RecordMenu onCreate={props.onCreate} content={draft} />
-            <span className="composer-mode">
-              <LotusMark size={15} />
-              小莲伴修
-            </span>
             <button className="agent-send" aria-label="发送消息" disabled={!draft.trim()}>
               <ArrowUpIcon size={20} />
             </button>
@@ -1254,7 +1290,6 @@ function ConnectedChat(props: ChatProps) {
             </button>
           </div>
         )}
-        <TodayStrip entries={props.entries} canWrite={Boolean(props.session?.capabilities.write)} onEdit={props.onEdit} />
         <ThreadPrimitive.Viewport className="chat-viewport">
           {conversation}
           <ThreadPrimitive.ScrollToBottom className="scroll-to-latest" aria-label="回到最新消息">
@@ -1305,7 +1340,21 @@ function ConnectedChat(props: ChatProps) {
           )}
           {voice.state !== "idle" && (
             <p className={`voice-status ${voice.state === "processing" ? "is-processing" : ""}`} role="status" aria-live="polite">
-              <i />
+              {voice.state === "recording" ? (
+                // 波形借录音机已开好的那条流，不再自己申请麦克风。
+                <LiveWaveform
+                  className="voice-live"
+                  active
+                  stream={voice.stream}
+                  mode="scrolling"
+                  barWidth={2}
+                  barGap={1}
+                  height={22}
+                  aria-hidden="true"
+                />
+              ) : (
+                <i />
+              )}
               {voice.state === "recording"
                 ? `正在听… ${Math.floor(voice.elapsedMs / 1000)} 秒 · 松开发送，上滑取消`
                 : "正在把这段话转成文字…"}
@@ -1357,10 +1406,8 @@ function ConnectedChat(props: ChatProps) {
                   <PhoneIcon size={19} />
                 </button>
               )}
-              <span className="composer-mode">
-                <LotusMark size={15} />
-                小莲伴修
-              </span>
+              {/* 键盘提示不再常驻：聚焦输入框时才淡入（CSS :focus-within），
+                  用过一次就不必天天看着。品牌标识顶栏已经有了，这里不再重复一次。 */}
               <span className="composer-hint" aria-hidden="true">
                 Enter 发送 · Shift+Enter 换行
               </span>

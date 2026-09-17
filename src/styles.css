@@ -2575,12 +2575,6 @@ button svg {
   padding: 0;
   outline: none;
 }
-.chat-top-label {
-  font-size: 10px;
-  color: var(--ink-muted);
-  border-left: 1px solid var(--muted);
-  padding-left: 15px;
-}
 .is-chat-page .breadcrumb {
   font-size: 14px;
   font-weight: 550;
@@ -2651,11 +2645,6 @@ button svg {
   border-radius: 50%;
   opacity: 0.65;
 }
-.welcome-overline {
-  font-size: 11px;
-  letter-spacing: 2px;
-  color: var(--ink-muted);
-}
 .chat-welcome h1 {
   font-size: clamp(24px, 2.3vw, 33px);
   line-height: 1.65;
@@ -2724,13 +2713,6 @@ button svg {
   gap: 12px;
   margin-top: 13px;
   min-height: 35px;
-}
-.composer-mode {
-  font-size: 11px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ink-muted);
 }
 .agent-send {
   display: grid;
@@ -2868,6 +2850,9 @@ button svg {
   padding: 32px 30px 18px;
   scrollbar-width: thin;
   scrollbar-color: var(--muted) transparent;
+  /* 两边都给滚动条留位，对话列才能和下面的输入框对齐到同一条中轴；
+     只留一边的话内容会被滚动条挤得左偏 5px，在大留白里很显眼。 */
+  scrollbar-gutter: stable both-edges;
 }
 .conversation-column {
   width: 100%;
@@ -2938,11 +2923,23 @@ button svg {
   font-size: 11px;
   gap: 4px;
 }
+/* 只在聚焦输入框时淡入。仍然占位（margin-left:auto 要把发送键顶到右边），
+   所以显隐之间工具栏不会跳。 */
 .composer-hint {
   font-size: 10px;
   color: var(--ink-faint);
   margin-left: auto;
   padding-right: 10px;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.agent-composer:focus-within .composer-hint {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer-hint {
+    transition: none;
+  }
 }
 @media (max-width: 640px), (pointer: coarse) {
   .composer-hint {
@@ -3282,10 +3279,6 @@ button svg {
     width: 49px;
     height: 49px;
   }
-  .welcome-overline {
-    font-size: 10px;
-    letter-spacing: 1.5px;
-  }
   .chat-welcome h1 {
     font-size: 24px;
     letter-spacing: 0.6px;
@@ -3313,9 +3306,6 @@ button svg {
   }
   .agent-composer-toolbar {
     margin-top: 12px;
-  }
-  .composer-mode {
-    font-size: 10px;
   }
   .chat-suggestions {
     gap: 8px;
@@ -3367,9 +3357,6 @@ button svg {
     display: flex;
     font-size: 9px;
     gap: 4px;
-  }
-  .is-chat-page .chat-top-label {
-    display: none;
   }
   .is-chat-page .topbar {
     gap: 9px;
@@ -3619,6 +3606,11 @@ button svg {
   background: var(--danger);
   animation: voice-pulse 1s ease-in-out infinite;
 }
+/* 录音时的实时波形，替掉那颗闪烁的红点；Canvas 要量宽度，给死值。 */
+.voice-status .voice-live {
+  width: 72px;
+  flex: none;
+}
 .voice-status.is-processing i {
   background: var(--ink-faint);
   animation: skeleton-breathe 1.2s ease-in-out infinite;
@@ -3653,17 +3645,10 @@ button svg {
   color: var(--brand-fg);
   flex: none;
 }
-.voice-clip .voice-bars {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  height: 16px;
-}
-.voice-clip .voice-bars i {
-  width: 2px;
-  border-radius: 1px;
-  background: currentColor;
-  opacity: 0.55;
+/* 真波形（AudioScrubber）。Canvas 按容器宽度算柱子数，必须给死宽度，否则量不出来不画。 */
+.voice-clip .voice-wave {
+  width: 132px;
+  flex: none;
 }
 .voice-clip time {
   font-variant-numeric: tabular-nums;
@@ -3688,10 +3673,6 @@ button svg {
 /* 侧栏展开时聊天页顶栏不再重复显示品牌，只留折叠键与页面标签 */
 .app-shell.has-sidebar.is-chat-page .chat-brand-link {
   display: none;
-}
-.app-shell.has-sidebar.is-chat-page .chat-top-label {
-  border-left: 0;
-  padding-left: 0;
 }
 .sidebar-scroll {
   flex: 1;
