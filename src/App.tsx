@@ -17,36 +17,13 @@ import { Dialog } from "./components/ui/dialog";
 import { LotusMark } from "./components/LotusMark";
 import { EntryDialog, ApprovalDialog, type EditorState } from "./components/EntryDialog";
 import { LoginDialog } from "./components/LoginDialog";
-import { Dashboard } from "./pages/Dashboard";
-import { SidebarBody, nav, useMediaQuery } from "./components/Sidebar";
-import { RecordsPage } from "./pages/RecordsPage";
+import { SidebarBody, useMediaQuery } from "./components/Sidebar";
+import { RecordsHub, recordAliases, recordTabs } from "./pages/RecordsHub";
 const Chat = lazy(() => import("./components/chat/Chat"));
-const CalendarPage = lazy(() => import("./pages/CalendarPage"));
-/** 三套主题：苔绿是小莲本色；朝霞、素纸分别套 tweakcn 的 Sunset Horizon / Vintage Paper 预设。 */
-const themes = [
-  { id: "lotus", label: "苔绿", hint: "小莲的本色" },
-  { id: "dawn", label: "朝霞", hint: "活泼一些" },
-  { id: "paper", label: "素纸", hint: "极简克制" },
-] as const;
-type ThemeId = (typeof themes)[number]["id"];
-function readTheme(): ThemeId {
-  try {
-    const stored = localStorage.getItem("lotus:theme");
-    return themes.some((t) => t.id === stored) ? (stored as ThemeId) : "lotus";
-  } catch {
-    return "lotus";
-  }
-}
-// index.html 里的内联脚本在首屏前已经设过一次，这里只在用户切换时更新并记住。
-function applyTheme(id: ThemeId) {
-  document.documentElement.dataset.theme = id;
-  try {
-    localStorage.setItem("lotus:theme", id);
-  } catch {
-    /* 没有存储也只是不记住选择 */
-  }
-}
-const validPages = [...nav.map((n) => n.id), "sources"];
+const validPages = ["chat", "sources", ...recordTabs.map((t) => t.id), ...Object.keys(recordAliases)];
+/** 顶栏与侧栏只认三个区；记录区里具体是哪个标签，由 RecordsHub 按 page 自己判断。 */
+const sectionOf = (page: string) => (page === "chat" || page === "sources" ? page : "records");
+const sectionLabel: Record<string, string> = { chat: "和小莲聊聊", records: "我的记录", sources: "法义文库" };
 function currentPage() {
   const hash = location.hash.slice(1);
   return validPages.includes(hash) ? hash : "chat";
@@ -66,7 +43,6 @@ export default function App() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [theme, setTheme] = useState<ThemeId>(readTheme);
   // 桌面侧栏：默认收起，聊天页第一眼只有对话。展开过就记住，手机仍是抽屉。
   const desktop = useMediaQuery("(min-width: 901px)");
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -196,7 +172,7 @@ export default function App() {
   }
   const pending = proposals.filter((p) => p.status === "pending");
   const sidebarProps = {
-    page,
+    page: sectionOf(page),
     session,
     entries,
     navigate,
@@ -280,7 +256,7 @@ export default function App() {
               {page !== "chat" && (
                 <>
                   <span className="breadcrumb-divider">/</span>
-                  <span>{nav.find((n) => n.id === page)?.label || "法义文库"}</span>
+                  <span>{sectionLabel[sectionOf(page)]}</span>
                 </>
               )}
             </div>
@@ -354,36 +330,21 @@ export default function App() {
                     onLogin={() => setLogin(true)}
                   />
                 </div>
-                {page === "today" ? (
-                  <Dashboard
-                    entries={entries}
-                    session={session}
-                    onCreate={create}
-                    onChat={chat}
-                    onNavigate={navigate}
-                  />
-                ) : page === "chat" ? null : page === "calendar" ? (
-                  <CalendarPage
-                    entries={entries}
-                    canWrite={canWrite}
-                    onCreate={() => create("schedule")}
-                    onEdit={edit}
-                  />
-                ) : page === "sources" ? (
+                {page === "chat" ? null : page === "sources" ? (
                   <Sources
                     connected={session?.capabilities.dharma || false}
                     onChat={() => chat("请检索印光法师文钞中关于摄心念佛的开示，附原文和出处。")}
                     canChat={session?.capabilities.chat || false}
                   />
                 ) : (
-                  <RecordsPage
-                    key={page}
+                  <RecordsHub
                     page={page}
                     entries={entries}
                     canWrite={canWrite}
                     onCreate={create}
                     onEdit={edit}
                     onDelete={(e) => void remove(e)}
+                    onNavigate={navigate}
                   />
                 )}
               </Suspense>
@@ -470,30 +431,6 @@ export default function App() {
             <div>
               <dt>日程提醒</dt>
               <dd>应用内查看</dd>
-            </div>
-            <div>
-              <dt>主题</dt>
-              <dd>
-                <div className="theme-picker" role="radiogroup" aria-label="主题">
-                  {themes.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={theme === t.id}
-                      className={`theme-swatch theme-swatch-${t.id} ${theme === t.id ? "is-active" : ""}`}
-                      onClick={() => {
-                        applyTheme(t.id);
-                        setTheme(t.id);
-                      }}
-                    >
-                      <i aria-hidden="true" />
-                      <span>{t.label}</span>
-                      <small>{t.hint}</small>
-                    </button>
-                  ))}
-                </div>
-              </dd>
             </div>
           </dl>
           <p className="field-hint">

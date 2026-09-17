@@ -2,18 +2,15 @@ import { useEffect, useRef, useMemo } from "react";
 import { createCalendar, createViewMonthGrid, createViewMonthAgenda } from "@schedule-x/calendar";
 import "temporal-polyfill/global";
 import "@schedule-x/theme-default/dist/index.css";
-import { PlusIcon } from "@phosphor-icons/react";
-import { Button } from "../components/ui/button";
 import type { Entry } from "../shared/contracts";
 
+/** 月视图。页头与「添加日程」在 RecordsHub；这里只渲染日历本身。 */
 export default function CalendarPage({
   entries,
-  onCreate,
   onEdit,
   canWrite,
 }: {
   entries: Entry[];
-  onCreate: () => void;
   onEdit: (entry: Entry) => void;
   canWrite: boolean;
 }) {
@@ -65,18 +62,7 @@ export default function CalendarPage({
     calendarRef.current?.events.set(events);
   }, [events]);
   return (
-    <div className="calendar-page page-enter">
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">LOTUS / 有所安排</div>
-          <h1>我的日历</h1>
-          <p>留一点时间给功课，也留一点给生活。</p>
-        </div>
-        <Button disabled={!canWrite} onClick={onCreate}>
-          <PlusIcon size={17} />
-          添加日程
-        </Button>
-      </div>
+    <div className="calendar-page">
       <div className="calendar-hint">所有时间以北京时间显示 · 日程提醒在应用内查看</div>
       {invalid > 0 && (
         <p className="error-text" role="status">

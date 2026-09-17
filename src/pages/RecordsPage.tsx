@@ -1,11 +1,95 @@
-import {useMemo,useState,Suspense,lazy} from 'react';
-import {PlusIcon,MagnifyingGlassIcon,NotebookIcon} from '@phosphor-icons/react';
-import type {Entry,EntryKind} from '../shared/contracts';
-import {Button} from '../components/ui/button';
-import {EntryCard,kindInfo} from '../components/cards/EntryCard';
-import {money,today} from '../lib/utils';
-const Heatmap=lazy(()=>import('../components/Heatmap'));
-export function RecordsPage({page,entries,canWrite,onCreate,onEdit,onDelete}:{page:string;entries:Entry[];canWrite:boolean;onCreate:(kind:EntryKind)=>void;onEdit:(entry:Entry)=>void;onDelete:(entry:Entry)=>void}){
- const [query,setQuery]=useState('');const [filter,setFilter]=useState('all');const kinds:EntryKind[]=page==='journal'?['note','diary']:[page as EntryKind];const title=page==='journal'?'我的记录':kindInfo[page as EntryKind]?.plural||'我的记录';const current=entries.filter(e=>kinds.includes(e.kind));const filtered=current.filter(e=>(filter==='all'||e.kind===filter||e.extra.direction===filter)&&(e.title+e.content).toLowerCase().includes(query.toLowerCase()));const month=current.filter(e=>e.date?.startsWith(today().slice(0,7)));const total=(direction:string)=>month.filter(e=>e.extra.direction===direction).reduce((n,e)=>n+(e.extra.amountCents||0),0);const activeDays=useMemo(()=>new Set(current.map(e=>e.date)).size,[current]);
- return <div className="records-page page-enter"><div className="page-heading"><div><div className="eyebrow">LOTUS / 日常有记</div><h1>{title}</h1><p>{page==='journal'?'把念头写下来，让心有地方歇一歇。':kindInfo[page as EntryKind]?.hint}</p></div><Button disabled={!canWrite} onClick={()=>onCreate(kinds[0]!)}><PlusIcon size={17}/>新增{page==='journal'?'记录':kindInfo[kinds[0]!].label}</Button></div>{page==='ledger'?<div className="ledger-stats"><div><span>本月支出</span><strong>{money(total('expense'))}</strong></div><div><span>本月收入</span><strong>{money(total('income'))}</strong></div><div><span>本月结余</span><strong>{money(total('income')-total('expense'))}</strong></div></div>:(page==='practice'||page==='merit')&&<section className="heatmap-section"><div className="section-title"><h2>{page==='merit'?'每日省察':'功课足迹'}</h2><span>已记录 {activeDays} 天 · 不作功德评判</span></div><Suspense fallback={<div className="skeleton" style={{height:120}}/>}><Heatmap entries={current}/></Suspense></section>}<div className="records-toolbar"><div className="filter-tabs"><button className={filter==='all'?'active':''} onClick={()=>setFilter('all')}>全部<span>{current.length}</span></button>{page==='journal'?(['note','diary'] as const).map(k=><button key={k} className={filter===k?'active':''} onClick={()=>setFilter(k)}>{kindInfo[k].label}</button>):page==='ledger'&&(['expense','income'] as const).map(k=><button key={k} className={filter===k?'active':''} onClick={()=>setFilter(k)}>{k==='expense'?'支出':'收入'}</button>)}</div><label className="search-input"><MagnifyingGlassIcon size={17}/><input aria-label="搜索记录" value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索记录"/></label></div>{filtered.length?<div className="entries-grid">{filtered.map(e=><EntryCard key={e.id} entry={e} canWrite={canWrite} onEdit={onEdit} onDelete={onDelete}/>)}</div>:<div className="large-empty"><NotebookIcon size={38} weight="light"/><h2>{query?'没有找到对应的记录':'在这里，留下一点日常'}</h2><p>{query?'试着换一个关键词。':'不用写得完整，也不用写得漂亮。从一条小小的记录开始。'}</p>{!query&&<Button variant="secondary" disabled={!canWrite} onClick={()=>onCreate(kinds[0]!)}><PlusIcon size={17}/>开始记录</Button>}</div>}</div>
+import { useMemo, useState, Suspense, lazy } from "react";
+import { MagnifyingGlassIcon, NotebookIcon, PlusIcon } from "@phosphor-icons/react";
+import type { Entry, EntryKind } from "../shared/contracts";
+import { Button } from "../components/ui/button";
+import { EntryCard } from "../components/cards/EntryCard";
+import { money, today } from "../lib/utils";
+const Heatmap = lazy(() => import("../components/Heatmap"));
+const ALL: EntryKind[] = ["practice", "diary", "note", "merit", "ledger", "schedule"];
+
+/** 某一类记录（或全部）的列表：统计、筛选、搜索与卡片。页头与类型标签由 RecordsHub 提供。 */
+export function RecordsPage({
+  kind,
+  entries,
+  canWrite,
+  onCreate,
+  onEdit,
+  onDelete,
+}: {
+  kind: EntryKind | "records";
+  entries: Entry[];
+  canWrite: boolean;
+  onCreate: (kind: EntryKind) => void;
+  onEdit: (entry: Entry) => void;
+  onDelete: (entry: Entry) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [direction, setDirection] = useState<"all" | "expense" | "income">("all");
+  const kinds = kind === "records" ? ALL : [kind];
+  const current = entries.filter((e) => kinds.includes(e.kind));
+  const filtered = current.filter(
+    (e) => (direction === "all" || e.extra.direction === direction) && (e.title + e.content).toLowerCase().includes(query.toLowerCase()),
+  );
+  const month = current.filter((e) => e.date?.startsWith(today().slice(0, 7)));
+  const total = (d: string) => month.filter((e) => e.extra.direction === d).reduce((n, e) => n + (e.extra.amountCents || 0), 0);
+  const activeDays = useMemo(() => new Set(current.map((e) => e.date)).size, [current]);
+  const createKind: EntryKind = kind === "records" ? "note" : kind;
+  return (
+    <div className="records-page">
+      {kind === "ledger" ? (
+        <div className="ledger-stats">
+          <div><span>本月支出</span><strong>{money(total("expense"))}</strong></div>
+          <div><span>本月收入</span><strong>{money(total("income"))}</strong></div>
+          <div><span>本月结余</span><strong>{money(total("income") - total("expense"))}</strong></div>
+        </div>
+      ) : (
+        (kind === "practice" || kind === "merit") && (
+          <section className="heatmap-section">
+            <div className="section-title">
+              <h2>{kind === "merit" ? "每日省察" : "功课足迹"}</h2>
+              <span>已记录 {activeDays} 天 · 不作功德评判</span>
+            </div>
+            <Suspense fallback={<div className="skeleton" style={{ height: 120 }} />}>
+              <Heatmap entries={current} />
+            </Suspense>
+          </section>
+        )
+      )}
+      <div className="records-toolbar">
+        {kind === "ledger" ? (
+          <div className="filter-tabs">
+            {(["all", "expense", "income"] as const).map((d) => (
+              <button key={d} className={direction === d ? "active" : ""} onClick={() => setDirection(d)}>
+                {d === "all" ? "全部" : d === "expense" ? "支出" : "收入"}
+                {d === "all" && <span>{current.length}</span>}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="records-count">{current.length} 条</span>
+        )}
+        <label className="search-input">
+          <MagnifyingGlassIcon size={17} />
+          <input aria-label="搜索记录" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索记录" />
+        </label>
+      </div>
+      {filtered.length ? (
+        <div className="entries-grid">
+          {filtered.map((e) => <EntryCard key={e.id} entry={e} canWrite={canWrite} onEdit={onEdit} onDelete={onDelete} />)}
+        </div>
+      ) : (
+        <div className="large-empty">
+          <NotebookIcon size={38} weight="light" />
+          <h2>{query ? "没有找到对应的记录" : "在这里，留下一点日常"}</h2>
+          <p>{query ? "试着换一个关键词。" : "不用写得完整，也不用写得漂亮。从一条小小的记录开始。"}</p>
+          {!query && (
+            <Button variant="secondary" disabled={!canWrite} onClick={() => onCreate(createKind)}>
+              <PlusIcon size={17} />
+              开始记录
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

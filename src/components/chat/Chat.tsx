@@ -11,6 +11,7 @@ import {
 import {
   getToolName,
   isToolUIPart,
+  type FileUIPart,
   type UIMessage,
 } from "ai";
 import { Streamdown, defaultRehypePlugins } from "streamdown";
@@ -23,6 +24,7 @@ import {
   ArrowSquareOutIcon,
   CheckCircleIcon,
   PlusIcon,
+  PaperclipIcon,
   FlowerLotusIcon,
   NotebookIcon,
   CalendarBlankIcon,
@@ -31,7 +33,6 @@ import {
   ChatTeardropTextIcon,
   ArrowsClockwiseIcon,
   HeartIcon,
-  ClockIcon,
   CopyIcon,
   PencilSimpleIcon,
   BookmarkSimpleIcon,
@@ -45,7 +46,19 @@ import { Button } from "../ui/button";
 import { Dialog } from "../ui/dialog";
 import { AudioScrubber } from "../ui/waveform";
 import { LiveWaveform } from "../ui/live-waveform";
+import { FileUpload, FileUploadTrigger, FileUploadContent } from "../ui/file-upload";
+import {
+  Attachment,
+  AttachmentGroup,
+  AttachmentMedia,
+  AttachmentContent,
+  AttachmentTitle,
+  AttachmentDescription,
+  AttachmentActions,
+  AttachmentAction,
+} from "../ui/attachment";
 import { useAudioPeaks } from "./useAudioPeaks";
+import { ACCEPT, attachmentLabel, readableSize, uploadAttachment, type Draft } from "./attachments";
 import { LotusMark } from "../LotusMark";
 import { EntrySummary, kindInfo } from "../cards/EntryCard";
 import {
@@ -167,81 +180,21 @@ function Suggestions({ onSelect }: { onSelect: (text: string) => void }) {
     </div>
   );
 }
-const dayKey = (at: number | string | Date) =>
-  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(at));
-const clock = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-/** 今天到期、尚未完成的日程，直接放进对话入口——这是产品承诺的“应用内到期提示”。 */
 /**
- * 今天未完成的日程条。已从聊天页撤下——聊天页只留对话。
- * 组件本身保留并导出，等「我的记录 / 每日功课」合并成统一页面时直接挂过去。
+ * 输入框左侧唯一的「+」：附件、通话、手动写一条记录都从这里进。
+ * 这是微信 + 号的语义（相册 / 文件 / 通话都在里面），对中文用户不用学。
+ * 附件项只在服务端绑了存储时出现；通话项只在语音与朗读都配好时出现，键盘用户也能从这里发起通话。
  */
-export function TodayStrip({ entries, canWrite, onEdit }: { entries: Entry[]; canWrite: boolean; onEdit: (entry: Entry) => void }) {
-  const today = dayKey(Date.now());
-  const key = `lotus:today-dismissed:${today}`;
-  const [dismissed, setDismissed] = useState(() => {
-    try {
-      return sessionStorage.getItem(key) === "1";
-    } catch {
-      return false;
-    }
-  });
-  const items = useMemo(
-    () =>
-      entries
-        .filter((e) => e.kind === "schedule" && e.extra.dueAt && !e.extra.completed && dayKey(e.extra.dueAt) === today)
-        .sort((a, b) => a.extra.dueAt!.localeCompare(b.extra.dueAt!))
-        .slice(0, 3),
-    [entries, today],
-  );
-  if (dismissed || items.length === 0) return null;
-  const now = Date.now();
-  return (
-    <div className="chat-today" role="status" aria-label="今天的日程">
-      <span className="chat-today-label">
-        <ClockIcon size={14} />
-        今天
-      </span>
-      {items.map((e) => {
-        const overdue = Date.parse(e.extra.dueAt!) < now;
-        return (
-          <button
-            key={e.id}
-            type="button"
-            className={`chat-today-item ${overdue ? "is-overdue" : ""}`}
-            disabled={!canWrite}
-            title={canWrite ? "查看或标记完成" : undefined}
-            onClick={() => onEdit(e)}
-          >
-            <time dateTime={e.extra.dueAt}>{clock.format(new Date(e.extra.dueAt!))}</time>
-            <span>{e.title}</span>
-            {overdue && <small>已过时间</small>}
-          </button>
-        );
-      })}
-      <button
-        type="button"
-        className="icon-link chat-today-close"
-        aria-label="今天不再提示"
-        onClick={() => {
-          setDismissed(true);
-          try {
-            sessionStorage.setItem(key, "1");
-          } catch {
-            /* 没有存储也只是不记住关闭状态 */
-          }
-        }}
-      >
-        <XIcon size={14} />
-      </button>
-    </div>
-  );
-}
-function RecordMenu({
+function ComposerMenu({
   onCreate,
   content = "",
+  attachments = false,
+  onCall,
 }: {
   onCreate: ChatProps["onCreate"];
   content?: string;
+  attachments?: boolean;
+  onCall?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -253,6 +206,7 @@ function RecordMenu({
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
+  const extras = attachments || Boolean(onCall);
   return (
     <div
       className="composer-record-menu"
@@ -267,16 +221,36 @@ function RecordMenu({
       <button
         type="button"
         className="composer-add"
-        aria-label="添加记录"
+        aria-label="添加附件、通话或写一条记录"
         aria-expanded={open}
-        aria-controls="composer-record-options"
+        aria-controls="composer-menu"
         onClick={() => setOpen(!open)}
       >
         <PlusIcon size={21} />
       </button>
       {open && (
-        <div className="composer-options" id="composer-record-options">
-          <p>手动填写一条记录</p>
+        <div className="composer-options" id="composer-menu">
+          {attachments && (
+            <FileUploadTrigger asChild>
+              <button type="button" onClick={() => setOpen(false)}>
+                <PaperclipIcon size={18} />
+                图片 / 文件
+              </button>
+            </FileUploadTrigger>
+          )}
+          {onCall && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onCall();
+              }}
+            >
+              <PhoneIcon size={18} />
+              和小莲通话
+            </button>
+          )}
+          <p className={extras ? "has-divider" : ""}>手动写一条记录</p>
           {Object.entries(kindInfo).map(([kind, info]) => (
             <button
               type="button"
@@ -429,6 +403,62 @@ function VoicePlayer({ meta }: { meta: VoiceMeta }) {
       />
       <time>{clipLength(meta.durationMs)}</time>
     </span>
+  );
+}
+/**
+ * 按住说话：按下开始、抬起发送、上滑 60px 取消。显式 setPointerCapture 让鼠标和触屏
+ * 都能在按钮外抬起仍收到 pointerup；不用 pointerleave 判取消，触屏的隐式捕获会让它在抬起时误触发。
+ */
+/**
+ * 按住说话 + 点击通话，合在一个麦克风键上。
+ *
+ * 指针按下先起一个 220ms 的计时器：到点才真正开始录音（长按），没到就抬手算点击，
+ * 打开实时通话。按下即录会让每次点击都录进半秒噪音，所以这个延迟是必要的。
+ * 显式 setPointerCapture 让鼠标和触屏都能在按钮外抬起仍收到 pointerup；
+ * 不用 pointerleave 判取消，触屏的隐式捕获会让它在抬起时误触发。
+ *
+ * 键盘只走录音（Enter / 空格 切换）——长按与点击的区别表达不出来；
+ * 键盘用户的通话入口需要另外给，目前还没有。
+ */
+/** 输入框上方的待发送附件条。用 shadcn 的 Attachment 组件渲染，样式跟着全站 token 走。 */
+function DraftAttachments({ items, onRemove }: { items: Draft[]; onRemove: (id: string) => void }) {
+  if (items.length === 0) return null;
+  return (
+    <AttachmentGroup className="composer-attachments">
+      {items.map((item) => (
+        <Attachment key={item.id}>
+          <AttachmentMedia variant={item.file.type.startsWith("image/") ? "image" : "icon"}>
+            {item.file.type.startsWith("image/") ? <img src={item.url} alt="" /> : <PaperclipIcon size={16} />}
+          </AttachmentMedia>
+          <AttachmentContent>
+            <AttachmentTitle>{item.file.name}</AttachmentTitle>
+            <AttachmentDescription>{readableSize(item.file.size)}</AttachmentDescription>
+          </AttachmentContent>
+          <AttachmentActions>
+            <AttachmentAction aria-label={`移除 ${item.file.name}`} onClick={() => onRemove(item.id)}>
+              <XIcon size={13} />
+            </AttachmentAction>
+          </AttachmentActions>
+        </Attachment>
+      ))}
+    </AttachmentGroup>
+  );
+}
+/** 对话里的附件卡：图片竖排给大图，其它横排给图标；点开在新标签查看（同源地址，自带登录 Cookie）。 */
+function MessageAttachment({ part }: { part: FileUIPart }) {
+  const image = part.mediaType.startsWith("image/");
+  return (
+    <a className={`message-attachment ${image ? "is-image" : ""}`} href={part.url} target="_blank" rel="noopener">
+      <Attachment orientation={image ? "vertical" : "horizontal"}>
+        <AttachmentMedia variant={image ? "image" : "icon"}>
+          {image ? <img src={part.url} alt={part.filename ?? ""} loading="lazy" /> : <PaperclipIcon size={16} />}
+        </AttachmentMedia>
+        <AttachmentContent>
+          <AttachmentTitle>{part.filename ?? "附件"}</AttachmentTitle>
+          <AttachmentDescription>{attachmentLabel(part.mediaType)}</AttachmentDescription>
+        </AttachmentContent>
+      </Attachment>
+    </a>
   );
 }
 /**
@@ -991,7 +1021,7 @@ function OfflineChat(props: ChatProps) {
             }}
           />
           <div className="agent-composer-toolbar">
-            <RecordMenu onCreate={props.onCreate} content={draft} />
+            <ComposerMenu onCreate={props.onCreate} content={draft} />
             <button className="agent-send" aria-label="发送消息" disabled={!draft.trim()}>
               <ArrowUpIcon size={20} />
             </button>
@@ -1086,16 +1116,7 @@ function ConnectedChat(props: ChatProps) {
         .filter((p) => p.type === "text")
         .map((p) => p.text)
         .join("\n");
-      if (!text.trim()) return;
-      // 断线或有待确认卡时，Enter 也不能把话发出去；把草稿放回输入框，而不是悄悄吞掉。
-      if (!canSendRef.current) {
-        runtime.thread.composer.setText(text);
-        return;
-      }
-      draftStore.clear();
-      const messageId = editingRef.current ?? undefined;
-      setEditing(null);
-      await sendMessage({ text, metadata: { createdAt: Date.now() }, ...(messageId ? { messageId } : {}) });
+      await dispatch(text);
     },
     onCancel: async () => {
       await stop();
@@ -1131,6 +1152,64 @@ function ConnectedChat(props: ChatProps) {
   );
   // 实时通话弹窗；挂断后刷新一次，通话里生成的待确认记录会以卡片出现在对话里。
   const [callOpen, setCallOpen] = useState(false);
+  // 待发送附件。createObjectURL 的地址要在移除/卸载时回收，否则整页留着这份内存。
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const draftsRef = useRef(drafts);
+  draftsRef.current = drafts;
+  const [uploading, setUploading] = useState(false);
+  const [composerError, setComposerError] = useState("");
+  const attachmentsReady = Boolean(props.session?.capabilities.attachments);
+  const addDrafts = useCallback((files: File[]) => {
+    setComposerError("");
+    setDrafts((list) => [
+      ...list,
+      ...files.map((file) => ({ id: `${Date.now()}-${file.name}-${Math.random().toString(36).slice(2, 8)}`, file, url: URL.createObjectURL(file) })),
+    ]);
+  }, []);
+  const removeDraft = useCallback((id: string) => {
+    setDrafts((list) => {
+      const gone = list.find((d) => d.id === id);
+      if (gone) URL.revokeObjectURL(gone.url);
+      return list.filter((d) => d.id !== id);
+    });
+  }, []);
+  useEffect(() => () => setDrafts((list) => { list.forEach((d) => URL.revokeObjectURL(d.url)); return []; }), []);
+  /**
+   * 文字与附件共用的发送口：先把附件逐个传上去拿到同源地址，再和文字一起发。
+   * 任何一个附件传失败就整条不发，文字放回输入框、附件原样留着，让用户决定重试还是去掉。
+   */
+  async function dispatch(text: string) {
+    const pending = draftsRef.current;
+    if (!text.trim() && pending.length === 0) return;
+    // 断线或有待确认卡时，Enter 也不能把话发出去；把草稿放回输入框，而不是悄悄吞掉。
+    if (!canSendRef.current) {
+      runtime.thread.composer.setText(text);
+      return;
+    }
+    const files: FileUIPart[] = [];
+    if (pending.length) {
+      setUploading(true);
+      setComposerError("");
+      try {
+        for (const draft of pending) {
+          const info = await uploadAttachment(draft.file);
+          files.push({ type: "file", mediaType: info.mediaType, filename: info.filename, url: info.url });
+        }
+      } catch (error) {
+        setComposerError(error instanceof Error ? error.message : "附件没能上传，请再试一次");
+        runtime.thread.composer.setText(text);
+        return;
+      } finally {
+        setUploading(false);
+      }
+      pending.forEach((d) => URL.revokeObjectURL(d.url));
+      setDrafts([]);
+    }
+    draftStore.clear();
+    const messageId = editingRef.current ?? undefined;
+    setEditing(null);
+    await sendMessage({ text, ...(files.length ? { files } : {}), metadata: { createdAt: Date.now() }, ...(messageId ? { messageId } : {}) });
+  }
   // 朗读：只在用户点击时合成与播放；同一时间只放一段。
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const speaker = useRef<HTMLAudioElement | null>(null);
@@ -1246,6 +1325,8 @@ function ConnectedChat(props: ChatProps) {
                         {part.text}
                       </Streamdown>
                     </div>
+                  ) : part.type === "file" ? (
+                    <MessageAttachment key={i} part={part} />
                   ) : null,
                 )}
                 {!streamingThis && (
@@ -1338,8 +1419,9 @@ function ConnectedChat(props: ChatProps) {
               )}
             </p>
           )}
+          {/* 录音状态条用 div 不用 p：里面的实时波形是 <div>，p 不能包块级元素。 */}
           {voice.state !== "idle" && (
-            <p className={`voice-status ${voice.state === "processing" ? "is-processing" : ""}`} role="status" aria-live="polite">
+            <div className={`voice-status ${voice.state === "processing" ? "is-processing" : ""}`} role="status" aria-live="polite">
               {voice.state === "recording" ? (
                 // 波形借录音机已开好的那条流，不再自己申请麦克风。
                 <LiveWaveform
@@ -1347,6 +1429,7 @@ function ConnectedChat(props: ChatProps) {
                   active
                   stream={voice.stream}
                   mode="scrolling"
+                  fadeEdges={false}
                   barWidth={2}
                   barGap={1}
                   height={22}
@@ -1363,7 +1446,7 @@ function ConnectedChat(props: ChatProps) {
                   取消
                 </button>
               )}
-            </p>
+            </div>
           )}
           {voiceError && (
             <p role="alert" className="error-text chat-error">
@@ -1373,7 +1456,20 @@ function ConnectedChat(props: ChatProps) {
               </button>
             </p>
           )}
+          {composerError && (
+            <p role="alert" className="error-text chat-error">
+              <span>{composerError}</span>
+              <button type="button" className="text-link" onClick={() => setComposerError("")}>
+                知道了
+              </button>
+            </p>
+          )}
+          <FileUpload onFilesAdded={addDrafts} accept={ACCEPT} disabled={!attachmentsReady}>
           <ComposerPrimitive.Root className="agent-composer">
+            <DraftAttachments items={drafts} onRemove={removeDraft} />
+            {drafts.some((d) => d.file.type.startsWith("image/")) && !props.session?.capabilities.vision && (
+              <p className="composer-note">小莲现在还看不到图片里的内容，会附在对话里保存。</p>
+            )}
             <ComposerPrimitive.Input
               aria-label="发送给小莲"
               placeholder="说说你的想法，或让小莲帮你做点什么…"
@@ -1384,7 +1480,11 @@ function ConnectedChat(props: ChatProps) {
               onChange={(e) => draftStore.save(e.target.value)}
             />
             <div className="agent-composer-toolbar">
-              <RecordMenu onCreate={props.onCreate} />
+              <ComposerMenu
+                onCreate={props.onCreate}
+                attachments={attachmentsReady}
+                onCall={voiceReady && speechReady ? () => setCallOpen(true) : undefined}
+              />
               {voiceReady && (
                 <VoiceButton
                   state={voice.state}
@@ -1393,18 +1493,6 @@ function ConnectedChat(props: ChatProps) {
                   onStop={voice.stop}
                   onCancel={voice.cancel}
                 />
-              )}
-              {voiceReady && speechReady && (
-                <button
-                  type="button"
-                  className="composer-call"
-                  disabled={!canSend || running}
-                  aria-label="和小莲通话"
-                  title="和小莲通话"
-                  onClick={() => setCallOpen(true)}
-                >
-                  <PhoneIcon size={19} />
-                </button>
               )}
               {/* 键盘提示不再常驻：聚焦输入框时才淡入（CSS :focus-within），
                   用过一次就不必天天看着。品牌标识顶栏已经有了，这里不再重复一次。 */}
@@ -1415,6 +1503,20 @@ function ConnectedChat(props: ChatProps) {
                 <ComposerPrimitive.Cancel className="agent-send" aria-label="停止回复">
                   <StopIcon size={18} />
                 </ComposerPrimitive.Cancel>
+              ) : drafts.length > 0 ? (
+                <button
+                  type="button"
+                  className="agent-send"
+                  disabled={!canSend || uploading}
+                  aria-label={uploading ? "正在上传附件" : "发送消息"}
+                  onClick={() => {
+                    const text = runtime.thread.composer.getState().text;
+                    runtime.thread.composer.setText("");
+                    void dispatch(text);
+                  }}
+                >
+                  {uploading ? <i className="agent-send-spinner" aria-hidden="true" /> : <ArrowUpIcon size={20} />}
+                </button>
               ) : (
                 <ComposerPrimitive.Send
                   className="agent-send"
@@ -1426,6 +1528,13 @@ function ConnectedChat(props: ChatProps) {
               )}
             </div>
           </ComposerPrimitive.Root>
+          <FileUploadContent>
+            <div className="upload-drop-hint">
+              <PaperclipIcon size={22} />
+              松开，把文件交给小莲
+            </div>
+          </FileUploadContent>
+          </FileUpload>
           {!active && <Suggestions onSelect={select} />}
           <Footnote />
         </div>

@@ -132,7 +132,7 @@ export function useVoiceRecorder(
     const blob = new Blob(parts, { type: active?.mimeType || parts[0]?.type || "audio/webm" });
     if (cancelled.current || blob.size === 0 || elapsed < MIN_MS) {
       setPhase("idle");
-      if (!cancelled.current && elapsed < MIN_MS) callbacks.current.onError("说话时间太短，再试一次");
+      if (!cancelled.current && elapsed < MIN_MS) callbacks.current.onError("按住说话，说完再松开");
       return;
     }
     setPhase("processing");
@@ -153,10 +153,15 @@ export function useVoiceRecorder(
     }
     starting.current = true;
     abortStart.current = false;
+    // 新一次录音开始就清掉取消标志。原来放在拿到流之后，而 dev 下 StrictMode 会先跑一遍卸载清理把它置真，
+    // 授权期间松手的那条提示就被静默吞掉了。
+    cancelled.current = false;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (abortStart.current) {
         stream.getTracks().forEach((track) => track.stop());
+        // 授权还没回来就松手了：多半是点了一下。不能什么都不说，否则用户以为坏了。
+        if (!cancelled.current) callbacks.current.onError("按住说话，说完再松开");
         return;
       }
       const mime = pickMime();

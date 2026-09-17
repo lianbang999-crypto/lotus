@@ -20,6 +20,10 @@ export class LotusStore {
     db.query("CREATE TABLE IF NOT EXISTS lotus_native_proposals (id TEXT PRIMARY KEY, status TEXT NOT NULL, operation TEXT NOT NULL)");
     db.query("CREATE TABLE IF NOT EXISTS lotus_executions (id TEXT PRIMARY KEY, operation TEXT NOT NULL, result TEXT NOT NULL)");
   }
+  /** 已绑定的账号 id；还没绑定时为 null。附件的 R2 键按账号前缀隔离，模型进料前取附件要用它。 */
+  owner(): string | null {
+    return this.db.query<{ account_id: string }>("SELECT account_id FROM lotus_owner WHERE id = 1")[0]?.account_id ?? null;
+  }
   assertOwner(accountId: string) {
     this.db.transaction(() => {
       const owner = this.db.query<{ account_id: string }>("SELECT account_id FROM lotus_owner WHERE id = 1")[0];

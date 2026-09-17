@@ -1,28 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  HouseSimpleIcon,
-  ChatCircleDotsIcon,
-  FlowerLotusIcon,
-  NotebookIcon,
-  HeartIcon,
-  WalletIcon,
-  CalendarBlankIcon,
-  BookOpenIcon,
-  GearSixIcon,
-  ArrowRightIcon,
-} from "@phosphor-icons/react";
+import { ChatCircleDotsIcon, NotebookIcon, BookOpenIcon, GearSixIcon, ArrowRightIcon } from "@phosphor-icons/react";
 import type { Entry, SessionInfo } from "../shared/contracts";
 import { LotusMark } from "./LotusMark";
 import { kindInfo } from "./cards/EntryCard";
 
+/** 侧栏只分三个区：聊天、记录、文库（文库在底部）。记录区里的类型由页面内的标签切换。 */
 export const nav = [
   { id: "chat", label: "和小莲聊聊", icon: ChatCircleDotsIcon },
-  { id: "today", label: "今日概览", icon: HouseSimpleIcon },
-  { id: "practice", label: "每日功课", icon: FlowerLotusIcon },
-  { id: "journal", label: "我的记录", icon: NotebookIcon },
-  { id: "merit", label: "功过省察", icon: HeartIcon },
-  { id: "ledger", label: "生活账本", icon: WalletIcon },
-  { id: "calendar", label: "我的日历", icon: CalendarBlankIcon },
+  { id: "records", label: "我的记录", icon: NotebookIcon },
 ];
 
 /** 桌面常驻侧栏与手机抽屉共用同一套判断；SSR 不涉及，直接读 matchMedia。 */
@@ -100,7 +85,7 @@ export function RecordsTimeline({
         ))
       )}
       {entries.length > 0 && (
-        <button type="button" className="timeline-more" onClick={() => onNavigate("journal")}>
+        <button type="button" className="timeline-more" onClick={() => onNavigate("records")}>
           查看全部记录
           <ArrowRightIcon size={13} />
         </button>
@@ -135,9 +120,8 @@ export function SidebarBody({ page, session, entries, navigate, onPick, onAccoun
       </a>
       <div className="sidebar-scroll">
         <nav aria-label="对话与记录">
-          {nav.map((item, i) => (
+          {nav.map((item) => (
             <div key={item.id}>
-              {i === 1 && <div className="nav-caption">对话里的日常</div>}
               <a
                 href={`#${item.id}`}
                 onClick={() => navigate(item.id)}

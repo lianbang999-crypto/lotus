@@ -3,33 +3,35 @@
 @source "../node_modules/streamdown/dist/*.js";
 
 /*
- * 主题 token（2026-09-16）：全站 415 处硬编码色值按明度与角色归并为下面 16 个变量，
- * 正文里只写 var(--token)。:root 是「苔绿」（小莲本色，各桶取明度中位数），
- * [data-theme="dawn"] 朝霞 / [data-theme="paper"] 素纸 由 tweakcn 预设推导。改色只改这里。
+ * 主题 token（2026-09-17 改为北欧极简）：全站只写 var(--token)，改色只改这里。
+ * 色值取自 Nord（github.com/nordtheme/nord，MIT）：Snow Storm 做面，Polar Night 做字，
+ * Frost 做主色，Aurora 红做错误色。Nord 只有 3 档亮面、4 档暗字，本站需要更多层次，
+ * 标「派生」的是按 Nord 相邻色插值或加深得到的；主色与错误色加深过，
+ * 为的是文字用法达到 WCAG AA（4.5:1），原值 nord10 当文字只有 3.5:1。
  *   white/bg/surface/surface-2   由亮到暗的面：卡片、页面底、气泡、条
  *   muted/border/border-strong   描边三档
- *   ink-faint/ink-muted/ink/ink-strong   文字四档
+ *   ink-faint/ink-muted/ink-soft/ink/ink-strong   文字五档
  *   brand/brand-strong/brand-fg  主色、深主色、主色上的字
  *   danger/danger-soft           错误色与其淡底
  */
 :root {
-  --white: #fcfdf8;
-  --bg: #f6f8f0;
-  --surface: #eef2e6;
-  --surface-2: #e6ebdd;
-  --muted: #e2e5d9;
-  --border: #d5dfc7;
-  --border-strong: #c6ccbc;
-  --ink-faint: #9eaf8a;
-  --ink-muted: #8b9681;
-  --ink-soft: #657756;
-  --brand: #637e4c;
-  --brand-strong: #4c6932;
-  --ink: #354b28;
-  --ink-strong: #263324;
-  --brand-fg: #fff;
-  --danger: #a35a3e;
-  --danger-soft: #eadfcd;
+  --white: #ffffff;
+  --bg: #eceff4; /* nord6 */
+  --surface: #e5e9f0; /* nord5 */
+  --surface-2: #dde3ec; /* 派生 */
+  --muted: #d8dee9; /* nord4 */
+  --border: #cdd5e1; /* 派生 */
+  --border-strong: #bfc8d6; /* 派生 */
+  --ink-faint: #9aa4b5; /* 派生，仅占位与装饰 */
+  --ink-muted: #5b697f; /* 派生，4.8:1 */
+  --ink-soft: #4c566a; /* nord3 */
+  --brand: #476b96; /* nord10 加深，文字 4.8:1 */
+  --brand-strong: #3d5f87; /* 派生，白字 6.6:1 */
+  --ink: #2e3440; /* nord0 */
+  --ink-strong: #242933; /* 派生 */
+  --brand-fg: #ffffff;
+  --danger: #a84d56; /* nord11 加深，4.7:1 */
+  --danger-soft: #f0e0e2; /* 派生 */
 }
 :root {
   --font-body: "Geist", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
@@ -62,45 +64,6 @@
   -webkit-font-smoothing: antialiased;
   color-scheme: light;
 }
-[data-theme="dawn"] {
-  --white: #ffffff;
-  --bg: #fff9f5;
-  --surface: #fff0eb;
-  --surface-2: #ffedea;
-  --muted: #ffe0d6;
-  --border: #f2d4cb;
-  --border-strong: #e2c6be;
-  --ink-faint: #c4beba;
-  --ink-muted: #78716C;
-  --ink-soft: #57504e;
-  --brand: #dc6e55;
-  --brand-strong: #c76550;
-  --ink: #3d3436;
-  --ink-strong: #362e30;
-  --brand-fg: #ffffff;
-  --danger: #e63946;
-  --danger-soft: #fae3e0;
-}
-[data-theme="paper"] {
-  --white: #fffcf5;
-  --bg: #f5f1e6;
-  --surface: #ece5d8;
-  --surface-2: #e2d8c3;
-  --muted: #dbd0ba;
-  --border: #d0c5b0;
-  --border-strong: #c3b9a5;
-  --ink-faint: #bfb8ab;
-  --ink-muted: #7d6b56;
-  --ink-soft: #605243;
-  --brand: #9c754e;
-  --brand-strong: #8e6b49;
-  --ink: #4a3f35;
-  --ink-strong: #42382f;
-  --brand-fg: #ffffff;
-  --danger: #b54a35;
-  --danger-soft: #eadcd1;
-  --font-body: "Songti SC", "Noto Serif SC", "Source Han Serif SC", Georgia, serif;
-}
 /* Tailwind 工具类（Streamdown 用）跟着 token 走；inline 让工具类直接引用上面的变量 */
 @theme inline {
   --color-background: var(--background);
@@ -116,48 +79,6 @@
   --color-paper: var(--bg);
   --font-sans: var(--font-body);
 }
-/* 设置弹窗里的主题选择 */
-.theme-picker {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.theme-swatch {
-  display: grid;
-  grid-template-columns: 22px 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 9px;
-  align-items: center;
-  text-align: left;
-  padding: 8px 12px 8px 9px;
-  border-radius: 10px;
-  border: 1px solid var(--muted);
-  background: var(--white);
-  color: var(--ink);
-  min-width: 128px;
-}
-.theme-swatch i {
-  grid-row: 1 / span 2;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
-}
-.theme-swatch span {
-  font-size: 13px;
-  font-weight: 600;
-}
-.theme-swatch small {
-  font-size: 11px;
-  color: var(--ink-muted);
-}
-.theme-swatch.is-active {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 25%, transparent);
-}
-.theme-swatch-lotus i { background: linear-gradient(135deg, #f6f8f0 45%, #687e52 55%); }
-.theme-swatch-dawn i { background: linear-gradient(135deg, #fff9f5 45%, #ee765a 55%); }
-.theme-swatch-paper i { background: linear-gradient(135deg, #f5f1e6 45%, #9c754e 55%); }
 * {
   box-sizing: border-box;
 }
@@ -240,7 +161,7 @@ button svg {
   align-items: center;
   justify-content: center;
   gap: 9px;
-  border-radius: 9px;
+  border-radius: 10px;
   min-height: 41px;
   padding: 10px 17px;
   font-size: 13px;
@@ -297,17 +218,29 @@ button svg {
   min-height: 35px;
   height: 35px;
   padding: 0;
-  border-radius: 9px;
+  border-radius: 10px;
 }
 .button-icon svg {
   width: 18px;
   height: 18px;
 }
+/* 附件卡上的删除键这类贴在内容边上的小动作，35px 的 .button-icon 太抢眼。 */
+.button-icon-xs {
+  width: 24px;
+  min-height: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 6px;
+}
+.button-icon-xs svg {
+  width: 14px;
+  height: 14px;
+}
 .icon-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  border-radius: 6px;
   padding: 6px;
   color: var(--ink-muted);
 }
@@ -354,7 +287,7 @@ button svg {
 .brand-mark {
   display: flex;
   background: var(--surface-2);
-  border-radius: 12px;
+  border-radius: 14px;
   width: 44px;
   height: 46px;
   align-items: center;
@@ -376,7 +309,7 @@ button svg {
 }
 .brand small {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1px;
   color: var(--ink-muted);
   margin-top: 3px;
@@ -402,7 +335,7 @@ button svg {
   align-items: center;
   gap: 13px;
   padding: 12px 15px;
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--brand);
   font-size: 13px;
   margin-bottom: 5px;
@@ -434,7 +367,7 @@ button svg {
   margin-left: auto;
 }
 .nav-caption {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-faint);
   letter-spacing: 1px;
   margin: 25px 15px 10px;
@@ -457,7 +390,7 @@ button svg {
   color: var(--ink-faint);
 }
 .sidebar-message p {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.9;
   letter-spacing: 0.4px;
 }
@@ -487,7 +420,7 @@ button svg {
   font-size: 13px;
 }
 .account-button strong {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   display: block;
   max-width: 120px;
@@ -496,7 +429,7 @@ button svg {
   white-space: nowrap;
 }
 .account-button small {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--ink-muted);
   display: block;
   margin-top: 4px;
@@ -513,7 +446,7 @@ button svg {
   align-items: center;
   justify-content: space-between;
   padding: 0 40px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-soft);
   background: var(--bg);
 }
@@ -534,7 +467,7 @@ button svg {
   align-items: center;
   gap: 7px;
   color: var(--ink-muted);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.5px;
 }
 .private-indicator > span {
@@ -548,7 +481,7 @@ button svg {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--brand);
   border: 1px solid var(--muted);
   padding: 6px 10px;
@@ -570,13 +503,13 @@ button svg {
   gap: 8px;
   background: var(--surface);
   color: var(--ink-muted);
-  font-size: 10px;
+  font-size: 12px;
   min-height: 29px;
   padding: 6px 20px;
   line-height: 1.6;
 }
 .mode-banner > span {
-  font-size: 9px;
+  font-size: 12px;
   padding: 1px 6px;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -598,90 +531,14 @@ button svg {
   align-items: center;
   gap: 5px;
 }
-.page-eyebrow {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  letter-spacing: 0.7px;
-  color: var(--ink-muted);
-  margin: 1px 0 20px;
-}
-.page-eyebrow > span {
-  color: var(--ink-faint);
-  font-size: 10px;
-}
 .eyebrow {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1.8px;
   color: var(--ink-muted);
   font-weight: 450;
   display: flex;
   align-items: center;
   gap: 7px;
-}
-.tiny-line {
-  width: 19px;
-  height: 1px;
-  background: var(--ink-faint);
-  display: inline-block;
-}
-.welcome-panel {
-  position: relative;
-  overflow: hidden;
-  min-height: 292px;
-  background: var(--surface);
-  border: 1px solid var(--surface-2);
-  border-radius: 14px;
-  padding: 36px 37px;
-}
-.welcome-copy {
-  position: relative;
-  z-index: 1;
-}
-.welcome-copy h1 {
-  font-size: 30px;
-  line-height: 1.65;
-  font-weight: 450;
-  letter-spacing: 2px;
-  margin: 13px 0 9px;
-  color: var(--ink-soft);
-}
-.welcome-copy p {
-  font-size: 11px;
-  line-height: 2;
-  color: var(--ink-muted);
-  letter-spacing: 0.8px;
-}
-.welcome-copy .button {
-  margin-top: 20px;
-  background: var(--bg);
-  border-color: var(--border);
-  font-size: 11px;
-  padding: 9px 13px;
-  min-height: 34px;
-  border-radius: 7px;
-}
-.welcome-copy .button svg {
-  width: 14px;
-}
-.lotus-illustration {
-  position: absolute;
-  right: -12px;
-  bottom: -5px;
-  height: 100%;
-  width: 54%;
-  max-width: 440px;
-}
-.hero-caption {
-  position: absolute;
-  bottom: 24px;
-  right: 29px;
-  font-size: 8px;
-  letter-spacing: 1.5px;
-  color: var(--ink-faint);
-}
-.home-composer-section {
-  margin-top: 29px;
 }
 .section-title {
   display: flex;
@@ -702,344 +559,9 @@ button svg {
   color: var(--ink-muted);
 }
 .section-title > span {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.4px;
   color: var(--ink-muted);
-}
-.home-composer {
-  border: 1px solid var(--muted);
-  background: var(--white);
-  border-radius: 12px;
-  padding: 17px 19px 12px;
-  box-shadow: 0 3px 10px -8px color-mix(in srgb, var(--brand-strong) 44%, transparent);
-}
-.home-composer:focus-within {
-  border-color: var(--ink-faint);
-  box-shadow: 0 0 0 3px var(--surface);
-}
-.home-composer textarea {
-  border: 0;
-  outline: none !important;
-  background: transparent;
-  width: 100%;
-  resize: none;
-  font-size: 12px;
-  line-height: 1.8;
-  min-height: 39px;
-  padding: 0;
-  color: var(--ink-soft);
-}
-.home-composer textarea::placeholder {
-  color: var(--ink-faint);
-}
-.composer-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 7px;
-}
-.composer-bottom > span {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ink-faint);
-  font-size: 9px;
-  letter-spacing: 0.3px;
-}
-.composer-bottom > .button {
-  background: var(--brand);
-  border-color: var(--brand);
-  width: 30px;
-  height: 30px;
-  min-height: 30px;
-  border-radius: 7px;
-}
-.quick-prompts {
-  display: flex;
-  gap: 9px;
-  margin-top: 13px;
-  flex-wrap: wrap;
-}
-.quick-prompts button {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--muted);
-  border-radius: 6px;
-  background: var(--bg);
-  font-size: 10px;
-  color: var(--ink-muted);
-  padding: 7px 10px;
-  transition:
-    background 0.18s,
-    transform 0.18s;
-}
-.quick-prompts button:hover {
-  background: var(--surface);
-  transform: translateY(-1px);
-  color: var(--brand);
-}
-.quick-prompts svg {
-  height: 14px;
-  width: 14px;
-}
-.dashboard-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
-  gap: 27px;
-  margin-top: 34px;
-}
-.quiet-count {
-  font-size: 10px;
-  line-height: 17px;
-  padding: 0 5px;
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--ink-faint);
-  font-weight: 400;
-  letter-spacing: 0;
-  margin-left: 1px;
-}
-.daily-empty {
-  min-height: 193px;
-  border: 1px solid var(--muted);
-  border-radius: 11px;
-  background: var(--white);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-.empty-symbol {
-  display: grid;
-  place-items: center;
-  width: 50px;
-  height: 45px;
-  color: var(--ink-faint);
-  background: var(--bg);
-  border-radius: 50%;
-  margin-bottom: 10px;
-}
-.daily-empty h3 {
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  color: var(--ink-soft);
-}
-.daily-empty p {
-  font-size: 10px;
-  color: var(--ink-faint);
-  margin-top: 8px;
-}
-.daily-empty .button {
-  margin-top: 16px;
-  font-size: 10px;
-  min-height: 29px;
-  padding: 6px 12px;
-  background: var(--bg);
-  border-color: var(--muted);
-  color: var(--ink-muted);
-}
-.daily-empty .button svg {
-  width: 13px;
-}
-.subtle-note {
-  font-size: 9px;
-  text-align: center;
-  color: var(--ink-faint);
-  margin-top: 11px;
-  letter-spacing: 0.4px;
-}
-.schedule-section > .section-title {
-  margin-bottom: 11px;
-}
-.schedule-empty {
-  min-height: 160px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 15px 17px 0;
-  color: var(--ink-faint);
-}
-.schedule-empty h3 {
-  font-size: 12px;
-  font-weight: 450;
-  margin-top: 13px;
-  color: var(--ink-muted);
-}
-.schedule-empty p {
-  font-size: 10px;
-  line-height: 1.9;
-  color: var(--ink-faint);
-  margin-top: 8px;
-}
-.schedule-empty .text-link {
-  margin-top: 12px;
-  font-size: 10px;
-}
-.calendar-link {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 10px;
-  color: var(--ink-muted);
-  border-top: 1px solid var(--surface-2);
-  margin: 15px 16px 0;
-  padding: 13px 0;
-  width: calc(100% - 32px);
-  text-align: left;
-}
-.calendar-link svg:last-child {
-  margin-left: auto;
-}
-.practice-list {
-  border: 1px solid var(--muted);
-  border-radius: 11px;
-  background: white;
-  padding: 5px 18px;
-  min-height: 193px;
-}
-.practice-row {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 18px 0;
-  border-bottom: 1px solid var(--surface);
-}
-.practice-row:last-child {
-  border-bottom: 0;
-}
-.round-icon {
-  width: 39px;
-  height: 39px;
-  display: grid;
-  place-items: center;
-  background: var(--surface);
-  border-radius: 10px;
-  color: var(--ink-muted);
-}
-.practice-row h3 {
-  font-size: 12px;
-  font-weight: 550;
-}
-.practice-row p {
-  font-size: 10px;
-  line-height: 1.8;
-  color: var(--ink-muted);
-  margin-top: 4px;
-  max-width: 180px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.practice-row strong {
-  font-size: 21px;
-  font-weight: 450;
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.practice-row small {
-  font-size: 10px;
-  margin-left: 5px;
-  color: var(--ink-muted);
-}
-.upcoming-list {
-  padding: 6px 10px;
-}
-.upcoming-list > div {
-  display: flex;
-  gap: 16px;
-  border-bottom: 1px solid var(--surface-2);
-  padding: 15px 3px;
-}
-.upcoming-list time {
-  font-size: 12px;
-  color: var(--ink-muted);
-  font-variant-numeric: tabular-nums;
-}
-.upcoming-list h3 {
-  font-size: 12px;
-  font-weight: 500;
-}
-.upcoming-list span {
-  display: block;
-  font-size: 10px;
-  color: var(--ink-faint);
-  margin-top: 6px;
-}
-.recent-section {
-  margin-top: 29px;
-}
-.recent-empty {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--bg);
-  border: 1px dashed var(--muted);
-  border-radius: 9px;
-  padding: 24px 19px;
-  color: var(--ink-faint);
-}
-.recent-empty p {
-  font-size: 10px;
-  line-height: 1.8;
-  letter-spacing: 0.3px;
-}
-.recent-empty .text-link {
-  font-size: 10px;
-  margin-left: auto;
-}
-.recent-list {
-  border-top: 1px solid var(--muted);
-}
-.recent-list button {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  text-align: left;
-  border-bottom: 1px solid var(--surface-2);
-  padding: 16px 6px;
-}
-.recent-list > button > svg {
-  color: var(--ink-faint);
-}
-.recent-list h3 {
-  font-size: 12px;
-  font-weight: 500;
-}
-.recent-list p {
-  font-size: 10px;
-  color: var(--ink-faint);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 390px;
-  white-space: nowrap;
-  margin-top: 5px;
-}
-.recent-list time {
-  font-size: 10px;
-  color: var(--ink-faint);
-  margin-left: auto;
-  white-space: nowrap;
-}
-.recent-list > button:hover {
-  background: var(--bg);
-}
-.page-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 29px 0 24px;
-  font-size: 9px;
-  color: var(--ink-faint);
-  letter-spacing: 0.8px;
-}
-.page-footer > span {
-  display: none;
 }
 .page-heading {
   display: flex;
@@ -1060,12 +582,58 @@ button svg {
   line-height: 1.8;
 }
 .page-heading > .button {
-  font-size: 11px;
+  font-size: 12px;
 }
-.records-page,
-.calendar-page,
+.records-hub,
 .sources-page {
   padding-bottom: 40px;
+}
+/* 「我的记录」的类型标签：一行，窄屏横向滑动；当前项用下划线不用底色，保持安静。 */
+.page-tabs {
+  display: flex;
+  gap: 4px;
+  margin: -8px 0 22px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.page-tabs::-webkit-scrollbar {
+  display: none;
+}
+.page-tabs a {
+  flex: none;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--ink-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+  transition: color 0.18s;
+}
+.page-tabs a:hover {
+  color: var(--ink);
+}
+.page-tabs a.active {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+  font-weight: 550;
+}
+/* 375px 宽下七个标签正好一行放下（2 字标签 42px × 6 + 3 字 55px + 间距），横滑只作兜底。 */
+@media (max-width: 640px) {
+  .page-tabs {
+    gap: 2px;
+  }
+  .page-tabs a {
+    padding: 10px 8px;
+  }
+}
+.records-count {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.records-hub .chat-today {
+  margin: 0 0 22px;
 }
 .records-toolbar {
   display: flex;
@@ -1091,7 +659,7 @@ button svg {
 }
 .filter-tabs span {
   margin-left: 6px;
-  font-size: 10px;
+  font-size: 12px;
   opacity: 0.8;
 }
 .search-input {
@@ -1099,7 +667,7 @@ button svg {
   align-items: center;
   gap: 8px;
   border: 1px solid var(--muted);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 8px 11px;
   background: var(--white);
   color: var(--ink-faint);
@@ -1107,7 +675,7 @@ button svg {
 .search-input input {
   border: 0;
   outline: none;
-  font-size: 11px;
+  font-size: 12px;
   width: 145px;
   background: transparent;
 }
@@ -1123,21 +691,21 @@ button svg {
 .entry-card {
   padding: 20px 22px;
   border: 1px solid var(--muted);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--white);
 }
 .entry-label {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-muted);
   margin-bottom: 14px;
 }
 .entry-label time {
   margin-left: auto;
   color: var(--ink-faint);
-  font-size: 9px;
+  font-size: 12px;
 }
 .entry-card h3,
 .approval-preview h3,
@@ -1179,7 +747,7 @@ button svg {
   justify-content: flex-end;
 }
 .entry-actions .button {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-faint);
   padding: 5px 7px;
 }
@@ -1189,7 +757,7 @@ button svg {
   margin: 13px 0;
 }
 .schedule-date span {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-faint);
 }
 .status-tag {
@@ -1198,8 +766,8 @@ button svg {
   gap: 4px;
   padding: 3px 7px;
   background: var(--surface);
-  font-size: 10px;
-  border-radius: 5px;
+  font-size: 12px;
+  border-radius: 6px;
   color: var(--ink-muted);
   white-space: nowrap;
 }
@@ -1210,7 +778,7 @@ button svg {
 .large-empty {
   text-align: center;
   border: 1px dashed var(--muted);
-  border-radius: 12px;
+  border-radius: 14px;
   margin-top: 18px;
   padding: 75px 20px;
   color: var(--ink-faint);
@@ -1231,7 +799,7 @@ button svg {
   line-height: 1.9;
 }
 .large-empty .button {
-  font-size: 11px;
+  font-size: 12px;
 }
 .ledger-stats {
   display: grid;
@@ -1252,7 +820,7 @@ button svg {
   border-right: 0;
 }
 .ledger-stats span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-faint);
 }
 .ledger-stats strong {
@@ -1266,7 +834,7 @@ button svg {
 .heatmap-section {
   background: white;
   border: 1px solid var(--muted);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 22px 24px;
   margin-bottom: 30px;
 }
@@ -1280,14 +848,14 @@ button svg {
 }
 .ch-domain-text {
   fill: var(--ink-muted);
-  font-size: 10px !important;
+  font-size: 12px !important;
 }
 .heatmap-legend {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 15px;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--ink-faint);
   margin-top: 18px;
   min-width: 460px;
@@ -1315,7 +883,7 @@ button svg {
 }
 .calendar-hint {
   color: var(--ink-muted);
-  font-size: 11px;
+  font-size: 12px;
   margin-bottom: 18px;
 }
 .calendar-host {
@@ -1341,7 +909,7 @@ button svg {
   height: 100%;
 }
 .sx__calendar {
-  border-radius: 12px !important;
+  border-radius: 14px !important;
   height: 100%;
   font-family: var(--font-sans) !important;
 }
@@ -1352,7 +920,7 @@ button svg {
   font-size: 12px;
 }
 .sx__month-grid-day__header-day-name {
-  font-size: 10px;
+  font-size: 12px;
 }
 .sx__event {
   cursor: pointer;
@@ -1364,7 +932,7 @@ button svg {
   padding: 27px 30px;
   background: var(--surface);
   border: 1px solid var(--muted);
-  border-radius: 12px;
+  border-radius: 14px;
   margin: 25px 0 20px;
   color: var(--ink-muted);
 }
@@ -1418,7 +986,7 @@ button svg {
   line-height: 1.9;
 }
 .source-status .button {
-  font-size: 11px;
+  font-size: 12px;
 }
 .connection-empty {
   display: flex;
@@ -1463,7 +1031,7 @@ button svg {
   overflow: auto;
   background: var(--white);
   border: 1px solid var(--surface-2);
-  border-radius: 17px;
+  border-radius: 20px;
   padding: 26px;
   z-index: 41;
   box-shadow: 0 20px 80px color-mix(in srgb, var(--ink-strong) 13%, transparent);
@@ -1482,7 +1050,7 @@ button svg {
   letter-spacing: 0.6px;
 }
 .dialog-heading p {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-muted);
   line-height: 1.8;
   margin-top: 8px;
@@ -1503,7 +1071,7 @@ button svg {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-muted);
 }
 .entry-form input,
@@ -1511,7 +1079,7 @@ button svg {
 .entry-form select {
   width: 100%;
   border: 1px solid var(--muted);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 10px 12px;
   background: white;
   font-size: 12px;
@@ -1536,7 +1104,7 @@ button svg {
 .input-unit {
   display: flex;
   border: 1px solid var(--muted);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--white);
 }
 .input-unit input {
@@ -1565,7 +1133,7 @@ button svg {
   border: 1px solid var(--surface-2);
   padding: 9px 6px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-faint);
 }
 .kind-picker button.selected {
@@ -1583,7 +1151,7 @@ button svg {
   border-top: 1px solid var(--surface-2);
 }
 .dialog-footer .button {
-  font-size: 11px;
+  font-size: 12px;
 }
 .approval-preview {
   padding: 20px;
@@ -1598,23 +1166,23 @@ button svg {
 }
 .previous-entry summary {
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-muted);
 }
 .previous-entry .entry-label {
   margin-top: 20px;
 }
 .field-hint {
-  font-size: 10px !important;
+  font-size: 12px !important;
   color: var(--ink-faint) !important;
   line-height: 1.85 !important;
 }
 .error-text {
   background: var(--surface);
   border: 1px solid var(--danger-soft);
-  border-radius: 7px;
+  border-radius: 6px;
   padding: 11px 13px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--danger);
   line-height: 1.8;
 }
@@ -1648,14 +1216,14 @@ button svg {
   text-align: left;
   border: 1px solid var(--muted);
   background: white;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 15px;
   font-size: 13px;
   color: var(--brand);
 }
 .pending-list small {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-faint);
   margin-top: 7px;
 }
@@ -1686,7 +1254,7 @@ button svg {
 }
 .skeleton {
   background: var(--surface);
-  border-radius: 9px;
+  border-radius: 10px;
   animation: skeleton-breathe 1.8s ease-in-out infinite;
 }
 .skeleton-heading {
@@ -1713,7 +1281,7 @@ button svg {
   padding: 10px;
   background: var(--surface-2);
   margin-top: 20px;
-  border-radius: 7px;
+  border-radius: 6px;
 }
 .chat-main {
   padding: 0;
@@ -1741,14 +1309,14 @@ button svg {
   color: var(--ink-soft);
 }
 .chat-header span {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--ink-faint);
   display: block;
   margin-top: 4px;
 }
 .chat-header .connection-label {
   margin-left: auto;
-  font-size: 10px;
+  font-size: 12px;
 }
 .chat-viewport {
   flex: 1;
@@ -1772,7 +1340,7 @@ button svg {
   margin: 14px 0;
 }
 .chat-welcome p {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-faint);
   line-height: 1.9;
 }
@@ -1781,7 +1349,7 @@ button svg {
   max-width: 100%;
 }
 .message-author {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-faint);
   display: block;
   margin-bottom: 9px;
@@ -1811,13 +1379,13 @@ button svg {
   background: var(--surface);
   border: 1px solid var(--muted);
   padding: 12px 17px;
-  border-radius: 12px 12px 3px 12px;
+  border-radius: 14px 14px 4px 14px;
   display: inline-block;
   text-align: left;
 }
 .chat-tool-card {
   border: 1px solid var(--muted);
-  border-radius: 11px;
+  border-radius: 10px;
   background: var(--white);
   padding: 18px;
   margin: 12px 0;
@@ -1830,7 +1398,7 @@ button svg {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-muted);
   border-bottom: 1px solid var(--surface);
   padding-bottom: 13px;
@@ -1845,7 +1413,7 @@ button svg {
   display: flex;
   gap: 5px;
   align-items: center;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-muted);
   margin-top: 10px;
 }
@@ -1877,7 +1445,7 @@ button svg {
   animation-delay: 0.3s;
 }
 .thinking span {
-  font-size: 10px;
+  font-size: 12px;
   margin-left: 7px;
 }
 .chat-input-wrap {
@@ -1887,14 +1455,14 @@ button svg {
   margin: auto;
 }
 .chat-footnote {
-  font-size: 9px;
+  font-size: 12px;
   text-align: center;
   color: var(--ink-faint);
   margin-top: 10px;
 }
 .evidence-card {
   border: 1px solid var(--muted);
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--white);
   padding: 13px 16px;
   margin: 9px 0;
@@ -1912,13 +1480,13 @@ button svg {
   font-weight: 500;
 }
 .evidence-card summary span {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--ink-faint);
   display: block;
   margin-top: 6px;
 }
 .citation-locator {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-faint);
   margin-top: 15px;
 }
@@ -1932,7 +1500,7 @@ button svg {
   white-space: pre-wrap;
 }
 .evidence-card a {
-  font-size: 10px;
+  font-size: 12px;
   display: flex;
   gap: 5px;
   align-items: center;
@@ -1976,18 +1544,6 @@ button svg {
   .main-content {
     padding-top: 35px;
   }
-  .welcome-panel {
-    min-height: 315px;
-  }
-  .welcome-copy h1 {
-    font-size: 33px;
-  }
-  .home-composer-section {
-    margin-top: 34px;
-  }
-  .dashboard-columns {
-    margin-top: 39px;
-  }
 }
 @media (max-width: 1100px) {
   .sidebar {
@@ -2005,40 +1561,8 @@ button svg {
   .topbar {
     padding: 0 27px;
   }
-  .welcome-panel {
-    padding: 30px 28px;
-    min-height: 285px;
-  }
-  .welcome-copy h1 {
-    font-size: 27px;
-  }
-  .lotus-illustration {
-    width: 51%;
-    right: -26px;
-  }
-  .hero-caption {
-    font-size: 7px;
-    right: 17px;
-  }
-  .dashboard-columns {
-    gap: 20px;
-  }
   .section-title > span {
-    font-size: 9px;
-  }
-  .recent-empty {
-    padding: 20px 15px;
-    gap: 9px;
-  }
-  .recent-empty .text-link {
-    display: none;
-  }
-  .quick-prompts {
-    gap: 7px;
-  }
-  .quick-prompts button {
-    font-size: 9px;
-    padding: 7px 8px;
+    font-size: 12px;
   }
   .toast {
     left: calc(50% + 109px);
@@ -2072,47 +1596,12 @@ button svg {
     font-size: 14px;
   }
   .brand small {
-    font-size: 8px;
+    font-size: 12px;
   }
   .nav-item {
     font-size: 12px;
     padding-left: 12px;
     gap: 10px;
-  }
-  .welcome-panel {
-    padding: 26px 23px;
-    min-height: 273px;
-  }
-  .welcome-copy h1 {
-    font-size: 25px;
-    letter-spacing: 1px;
-  }
-  .welcome-copy p {
-    font-size: 10px;
-  }
-  .lotus-illustration {
-    opacity: 0.6;
-    right: -58px;
-    width: 62%;
-  }
-  .hero-caption {
-    display: none;
-  }
-  .dashboard-columns {
-    grid-template-columns: 1fr;
-  }
-  .schedule-section {
-    display: none;
-  }
-  .page-eyebrow > span {
-    display: none;
-  }
-  .quick-prompts {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-  .quick-prompts button {
-    justify-content: center;
   }
   .entries-grid {
     grid-template-columns: 1fr;
@@ -2125,11 +1614,11 @@ button svg {
   }
   .page-heading > .button {
     padding: 9px 12px;
-    font-size: 10px;
+    font-size: 12px;
     margin-top: 20px;
   }
   .page-heading p {
-    font-size: 11px;
+    font-size: 12px;
   }
   .records-toolbar {
     flex-wrap: wrap;
@@ -2148,7 +1637,7 @@ button svg {
     font-size: 18px;
   }
   .source-book p {
-    font-size: 11px;
+    font-size: 12px;
   }
   .source-book > svg {
     display: none;
@@ -2212,7 +1701,7 @@ button svg {
     font-size: 16px;
   }
   .brand small {
-    font-size: 10px;
+    font-size: 12px;
   }
   .nav-item {
     font-size: 13px;
@@ -2228,7 +1717,7 @@ button svg {
   .topbar {
     height: 58px;
     padding: 0 18px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .topbar > div {
     gap: 9px;
@@ -2248,48 +1737,13 @@ button svg {
     max-width: 100%;
   }
   .mode-banner {
-    font-size: 9px;
+    font-size: 12px;
     justify-content: flex-start;
     padding: 6px 18px;
     gap: 6px;
   }
   .mode-banner > span {
-    font-size: 8px;
-  }
-  .page-eyebrow {
-    font-size: 9px;
-    margin-bottom: 15px;
-  }
-  .welcome-panel {
-    padding: 26px 23px;
-    min-height: 293px;
-  }
-  .welcome-copy h1 {
-    font-size: 27px;
-    letter-spacing: 1px;
-    line-height: 1.8;
-    margin: 13px 0 8px;
-  }
-  .welcome-copy p {
-    font-size: 10px;
-    line-height: 2.1;
-  }
-  .welcome-copy .button {
-    font-size: 10px;
-    margin-top: 20px;
-  }
-  .lotus-illustration {
-    width: 63%;
-    right: -63px;
-    bottom: -28px;
-    opacity: 0.43;
-  }
-  .welcome-copy .eyebrow {
-    font-size: 8px;
-    letter-spacing: 1px;
-  }
-  .home-composer-section {
-    margin-top: 26px;
+    font-size: 12px;
   }
   .section-title {
     margin-bottom: 13px;
@@ -2298,77 +1752,7 @@ button svg {
     font-size: 12px;
   }
   .section-title > span {
-    font-size: 8px;
-  }
-  .home-composer {
-    padding: 15px 14px 11px;
-  }
-  .home-composer textarea {
-    font-size: 11px;
-    line-height: 1.9;
-  }
-  .composer-bottom > span {
-    font-size: 8px;
-  }
-  .quick-prompts {
-    margin-top: 11px;
-    gap: 8px;
-  }
-  .quick-prompts button {
-    font-size: 10px;
-    padding: 8px 9px;
-  }
-  .dashboard-columns {
-    margin-top: 28px;
-    gap: 24px;
-  }
-  .schedule-section {
-    display: block;
-  }
-  .schedule-empty {
-    padding: 8px 12px;
-    min-height: 150px;
-  }
-  .daily-empty {
-    min-height: 195px;
-  }
-  .schedule-section {
-    border: 1px solid var(--muted);
-    padding: 19px 17px 0;
-    border-radius: 11px;
-  }
-  .schedule-section .section-title {
-    margin-bottom: 4px;
-  }
-  .schedule-empty p br {
-    display: none;
-  }
-  .schedule-empty {
-    position: relative;
-  }
-  .schedule-empty > svg {
-    position: absolute;
-    right: 12px;
-    top: 23px;
-    width: 42px;
-    height: 42px;
-    opacity: 0.55;
-  }
-  .schedule-empty .text-link {
-    font-size: 10px;
-  }
-  .calendar-link {
-    margin-top: 0;
-  }
-  .recent-section {
-    margin-top: 27px;
-  }
-  .recent-empty p {
-    font-size: 9px;
-  }
-  .page-footer {
-    font-size: 8px;
-    padding: 26px 0;
+    font-size: 12px;
   }
   .page-heading {
     margin: 7px 0 25px;
@@ -2378,10 +1762,10 @@ button svg {
     font-size: 25px;
   }
   .page-heading .eyebrow {
-    font-size: 8px;
+    font-size: 12px;
   }
   .page-heading > .button {
-    font-size: 9px;
+    font-size: 12px;
     padding: 8px 10px;
     min-height: 32px;
     gap: 6px;
@@ -2390,14 +1774,14 @@ button svg {
     width: 14px;
   }
   .page-heading p {
-    font-size: 10px;
+    font-size: 12px;
   }
   .search-input {
     width: 100%;
   }
   .search-input input {
     width: 100%;
-    font-size: 11px;
+    font-size: 12px;
   }
   .records-toolbar {
     gap: 14px;
@@ -2409,7 +1793,7 @@ button svg {
     padding: 52px 20px;
   }
   .large-empty p {
-    font-size: 11px;
+    font-size: 12px;
   }
   .form-grid {
     gap: 10px;
@@ -2422,23 +1806,23 @@ button svg {
     font-size: 17px;
   }
   .dialog-heading p {
-    font-size: 10px;
+    font-size: 12px;
   }
   .kind-picker button {
-    font-size: 10px;
+    font-size: 12px;
   }
   .dialog-footer {
     gap: 6px;
   }
   .dialog-footer .button {
-    font-size: 10px;
+    font-size: 12px;
     padding: 10px 12px;
   }
   .toast {
     left: 50%;
     width: max-content;
     max-width: calc(100vw - 28px);
-    font-size: 11px;
+    font-size: 12px;
     bottom: 19px;
   }
   .ledger-stats {
@@ -2449,20 +1833,20 @@ button svg {
     letter-spacing: -0.5px;
   }
   .ledger-stats span {
-    font-size: 10px;
+    font-size: 12px;
   }
   .ledger-stats > div {
     padding: 0 11px;
   }
   .heatmap-section .section-title > span {
-    font-size: 9px;
+    font-size: 12px;
   }
   .calendar-host {
     height: 65dvh;
     min-height: 540px;
   }
   .calendar-hint {
-    font-size: 9px;
+    font-size: 12px;
   }
   .sx__calendar-header {
     flex-wrap: wrap;
@@ -2476,7 +1860,7 @@ button svg {
     font-size: 14px;
   }
   .source-intro p {
-    font-size: 10px;
+    font-size: 12px;
   }
   .source-book {
     padding: 25px 4px;
@@ -2485,16 +1869,16 @@ button svg {
     font-size: 17px;
   }
   .source-book .eyebrow {
-    font-size: 8px;
+    font-size: 12px;
   }
   .source-book p {
-    font-size: 10px;
+    font-size: 12px;
   }
   .source-status p {
-    font-size: 10px;
+    font-size: 12px;
   }
   .source-status .button {
-    font-size: 10px;
+    font-size: 12px;
   }
   .chat-main {
     padding: 0;
@@ -2507,7 +1891,7 @@ button svg {
     padding: 21px 18px;
   }
   .chat-header .connection-label {
-    font-size: 8px;
+    font-size: 12px;
   }
   .message-text {
     font-size: 12px;
@@ -2516,7 +1900,7 @@ button svg {
     padding: 10px 13px 12px;
   }
   .chat-footnote {
-    font-size: 8px;
+    font-size: 12px;
   }
   .connection-empty {
     padding: 75px 10px;
@@ -2525,13 +1909,10 @@ button svg {
     font-size: 21px;
   }
   .connection-empty p {
-    font-size: 11px;
-  }
-  .recent-list p {
-    max-width: 205px;
+    font-size: 12px;
   }
   .error-banner {
-    font-size: 10px;
+    font-size: 12px;
     padding: 10px 18px;
   }
 }
@@ -2676,7 +2057,7 @@ button svg {
 }
 .agent-composer {
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 20px;
   background: var(--white);
   padding: 19px 20px 13px;
   box-shadow: 0 5px 22px -12px color-mix(in srgb, var(--brand-strong) 19%, transparent);
@@ -2720,7 +2101,7 @@ button svg {
   margin-left: auto;
   width: 36px;
   height: 36px;
-  border-radius: 11px;
+  border-radius: 10px;
   color: var(--brand-fg);
   background: var(--brand);
   transition: background 0.18s;
@@ -2740,7 +2121,7 @@ button svg {
 .composer-add {
   width: 34px;
   height: 34px;
-  border-radius: 9px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   color: var(--ink-muted);
@@ -2758,10 +2139,10 @@ button svg {
   z-index: 12;
   bottom: 45px;
   left: 0;
-  width: 237px;
+  width: 264px; /* 「图片 / 文件」「和小莲通话」两项并排放得下，不折行 */
   border: 1px solid var(--muted);
   background: var(--white);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 14px;
   box-shadow: 0 10px 35px color-mix(in srgb, var(--ink) 15%, transparent);
   display: grid;
@@ -2770,7 +2151,7 @@ button svg {
 }
 .composer-options > p {
   grid-column: 1/-1;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-muted);
   padding: 0 5px 8px;
 }
@@ -2778,8 +2159,9 @@ button svg {
   display: flex;
   align-items: center;
   gap: 9px;
+  white-space: nowrap;
   padding: 11px 9px;
-  border-radius: 7px;
+  border-radius: 6px;
   font-size: 12px;
   color: var(--brand);
   text-align: left;
@@ -2787,9 +2169,15 @@ button svg {
 .composer-options > button:hover {
   background: var(--surface);
 }
+/* 菜单上半是附件与通话，下半是手动记录；有上半时给记录标题一条分隔线。 */
+.composer-options > p.has-divider {
+  border-top: 1px solid var(--surface);
+  margin-top: 6px;
+  padding-top: 12px;
+}
 .composer-options > small {
   grid-column: 1/-1;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--ink-muted);
   border-top: 1px solid var(--surface);
   margin-top: 7px;
@@ -2807,11 +2195,11 @@ button svg {
   justify-content: center;
   gap: 7px;
   border: 1px solid var(--muted);
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--bg);
   padding: 12px 7px;
   color: var(--ink-muted);
-  font-size: 11px;
+  font-size: 12px;
   transition:
     background 0.18s,
     border-color 0.18s;
@@ -2825,7 +2213,7 @@ button svg {
   color: var(--ink-muted);
 }
 .chat-footnote {
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.8;
   margin-top: 16px;
   text-align: center;
@@ -2837,7 +2225,7 @@ button svg {
 .chat-bottom-note {
   text-align: center;
   color: var(--ink-faint);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 2px;
   margin-top: auto;
   padding: 28px 0 24px;
@@ -2869,12 +2257,12 @@ button svg {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-muted);
   margin-bottom: 12px;
 }
 .message-time {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
   margin-left: 2px;
@@ -2885,7 +2273,7 @@ button svg {
   gap: 12px;
   margin: 6px 0 26px;
   color: var(--ink-faint);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1px;
 }
 .chat-day-divider::before,
@@ -2905,7 +2293,7 @@ button svg {
   flex-shrink: 0;
 }
 .chat-thread-actions .text-link {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-muted);
   gap: 5px;
 }
@@ -2920,13 +2308,13 @@ button svg {
   margin-bottom: 10px;
 }
 .chat-error .text-link {
-  font-size: 11px;
+  font-size: 12px;
   gap: 4px;
 }
 /* 只在聚焦输入框时淡入。仍然占位（margin-left:auto 要把发送键顶到右边），
    所以显隐之间工具栏不会跳。 */
 .composer-hint {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-faint);
   margin-left: auto;
   padding-right: 10px;
@@ -2965,7 +2353,7 @@ button svg {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--ink-faint);
   padding: 4px 7px;
   border-radius: 6px;
@@ -2984,7 +2372,7 @@ button svg {
 }
 .message-editing {
   font-style: normal;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-muted);
   background: var(--surface);
   padding: 1px 7px;
@@ -2998,7 +2386,7 @@ button svg {
   flex-wrap: wrap;
 }
 .chat-editing-bar .text-link {
-  font-size: 11px;
+  font-size: 12px;
 }
 /* 今天的日程条：对话入口上方一行，可点开查看/完成，可关闭到明天。 */
 .chat-today {
@@ -3016,7 +2404,7 @@ button svg {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1px;
   color: var(--ink-faint);
 }
@@ -3028,7 +2416,7 @@ button svg {
   border: 1px solid var(--muted);
   border-radius: 999px;
   background: var(--bg);
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--brand);
   max-width: 100%;
 }
@@ -3043,7 +2431,7 @@ button svg {
   max-width: 220px;
 }
 .chat-today-item small {
-  font-size: 9.5px;
+  font-size: 12px;
   color: var(--danger);
 }
 .chat-today-item.is-overdue {
@@ -3078,7 +2466,7 @@ button svg {
   background: var(--surface);
   border-color: var(--muted);
   padding: 12px 18px;
-  border-radius: 15px 15px 4px 15px;
+  border-radius: 14px 14px 4px 14px;
   color: var(--ink-soft);
 }
 .message-text {
@@ -3144,7 +2532,7 @@ button svg {
 .message-text [data-streamdown="inline-code"] {
   font-size: 0.92em;
   background: var(--surface);
-  border-radius: 5px;
+  border-radius: 6px;
   padding: 1px 5px;
   color: var(--ink-soft);
 }
@@ -3165,7 +2553,7 @@ button svg {
 }
 .chat-tool-card {
   padding: 20px 23px;
-  border-radius: 13px;
+  border-radius: 14px;
   max-width: 600px;
   margin: 14px 0 23px;
 }
@@ -3191,7 +2579,7 @@ button svg {
   color: var(--ink-muted) !important;
 }
 .chat-tool-card .saved-label {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--brand);
   margin-top: 17px;
 }
@@ -3202,7 +2590,7 @@ button svg {
   margin-top: 13px;
   padding: 14px 16px;
   border: 1px solid var(--muted);
-  border-radius: 11px;
+  border-radius: 10px;
   background: var(--surface);
   color: var(--ink-muted);
 }
@@ -3212,7 +2600,7 @@ button svg {
   color: var(--ink-soft);
 }
 .chat-connection-notice p {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-muted);
   margin-top: 6px;
   line-height: 1.8;
@@ -3222,13 +2610,13 @@ button svg {
 }
 .chat-connection-notice div > button {
   color: var(--brand);
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 9px;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 .chat-reconnecting {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-muted);
   padding: 0 0 10px;
 }
@@ -3287,7 +2675,7 @@ button svg {
     margin: 14px auto 11px;
   }
   .chat-welcome p {
-    font-size: 11px;
+    font-size: 12px;
     line-height: 2;
   }
   .mobile-break {
@@ -3298,7 +2686,7 @@ button svg {
   }
   .agent-composer {
     padding: 16px 15px 12px;
-    border-radius: 15px;
+    border-radius: 14px;
   }
   .agent-composer textarea {
     font-size: 13px;
@@ -3312,7 +2700,7 @@ button svg {
     margin-top: 15px;
   }
   .chat-suggestions button {
-    font-size: 10px;
+    font-size: 12px;
     padding: 12px 7px;
   }
   .chat-suggestions svg {
@@ -3320,7 +2708,7 @@ button svg {
     height: 17px;
   }
   .chat-footnote {
-    font-size: 9px;
+    font-size: 12px;
     margin-top: 15px;
   }
   .chat-footnote span {
@@ -3328,7 +2716,7 @@ button svg {
     margin-left: 0;
   }
   .chat-bottom-note {
-    font-size: 9px;
+    font-size: 12px;
     padding: 20px 0;
   }
   .chat-input-wrap {
@@ -3355,7 +2743,7 @@ button svg {
   }
   .is-chat-page .topbar-actions .private-indicator {
     display: flex;
-    font-size: 9px;
+    font-size: 12px;
     gap: 4px;
   }
   .is-chat-page .topbar {
@@ -3366,13 +2754,13 @@ button svg {
   }
   .is-chat-page .pending-button {
     padding: 5px 7px;
-    font-size: 9px;
+    font-size: 12px;
   }
   .is-chat-page .pending-button svg {
     width: 13px;
   }
   .is-chat-page .mode-banner {
-    font-size: 8px;
+    font-size: 12px;
     padding: 6px 13px;
     gap: 5px;
   }
@@ -3564,7 +2952,7 @@ button svg {
 .composer-voice {
   width: 34px;
   height: 34px;
-  border-radius: 9px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   color: var(--ink-muted);
@@ -3645,6 +3033,72 @@ button svg {
   color: var(--brand-fg);
   flex: none;
 }
+/*
+ * 全站字号下限 12px（2026-09-18）：之前 7–11px 用了 143 处，眉题、时间戳、操作标签、脚注全在里面。
+ * 这个产品的用户很多是长辈、多在手机上用，「极简」不能靠把字缩小来实现——少放东西，放上去的要看得清。
+ * 需要更弱的层级用颜色（--ink-muted / --ink-faint）和字距表达，不再用字号。
+ */
+/* ===== 附件：待发送预览条、拖拽提示、对话里的附件卡 ===== */
+/* 附件条下面的一句实话：当前模型看不到图片内容。 */
+.composer-note {
+  font-size: 12px;
+  color: var(--ink-muted);
+  margin: -4px 0 10px;
+}
+/* 对话里的附件卡：图片竖排给大图，其它横排；用户消息靠右。 */
+.message-attachment {
+  display: inline-flex;
+  max-width: 260px;
+  margin: 2px 0 8px;
+  text-decoration: none;
+  color: inherit;
+}
+.message-attachment.is-image {
+  max-width: 220px;
+}
+.message-attachment [data-slot="attachment"] {
+  width: 100%;
+}
+.message-user .message-attachment {
+  margin-left: auto;
+}
+/* 附件上传中的转圈，放在发送键里。 */
+.agent-send-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--brand-fg) 40%, transparent);
+  border-top-color: var(--brand-fg);
+  animation: composer-spin 0.8s linear infinite;
+}
+@keyframes composer-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-send-spinner { animation-duration: 2s; }
+}
+/* 预览条在输入框内、文字上方；多个附件横向排，窄屏换行不挤压输入区。 */
+.composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.composer-attachments [data-slot="attachment"] {
+  max-width: 230px;
+}
+/* 拖拽到窗口任意处时的提示层，FileUploadContent 用 portal 挂在 body 上。 */
+.upload-drop-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 26px;
+  border-radius: 14px;
+  border: 1px dashed var(--brand);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 14px;
+}
 /* 真波形（AudioScrubber）。Canvas 按容器宽度算柱子数，必须给死宽度，否则量不出来不画。 */
 .voice-clip .voice-wave {
   width: 132px;
@@ -3695,7 +3149,7 @@ button svg {
   gap: 9px;
   width: 100%;
   padding: 7px 15px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 12px;
   color: var(--ink-soft);
   text-align: left;
@@ -3717,19 +3171,19 @@ button svg {
 }
 .timeline-item small {
   color: var(--ink-faint);
-  font-size: 10px;
+  font-size: 12px;
   flex: none;
 }
 .timeline-more {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--brand);
   padding: 8px 15px;
 }
 .timeline-empty {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
   color: var(--ink-faint);
   padding: 6px 15px;
@@ -3779,24 +3233,6 @@ button svg {
 }
 
 /* ===== 实时通话 + 朗读 ===== */
-.composer-call {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  display: grid;
-  place-items: center;
-  color: var(--ink-faint);
-  border: 1px solid var(--muted);
-  background: var(--white);
-  transition: background 0.18s, color 0.18s;
-}
-.composer-call:hover:not(:disabled) {
-  background: var(--surface);
-  color: var(--brand-strong);
-}
-.composer-call:disabled {
-  opacity: 0.45;
-}
 .voice-call {
   display: flex;
   flex-direction: column;
@@ -3888,7 +3324,7 @@ button svg {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.5px;
   color: var(--ink-faint);
   border: 1px solid var(--muted);
@@ -3902,4 +3338,35 @@ button svg {
 @media (prefers-reduced-motion: reduce) {
   .voice-call[data-status="speaking"] .voice-call-mark { animation: none; }
   .voice-call-mark { transition: none; }
+}
+
+/* ===== 触屏：手指要按的东西放大到 44px（iOS 人机指南），桌面保持紧凑 ===== */
+@media (pointer: coarse) {
+  .composer-add,
+  .composer-voice,
+  .agent-send {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+  .message-actions button {
+    min-height: 36px;
+    padding: 6px 10px;
+  }
+  .voice-clip button {
+    width: 36px;
+    height: 36px;
+  }
+  .button-icon-xs {
+    width: 28px;
+    height: 28px;
+    min-height: 28px;
+  }
+}
+
+/* 段落末行不留一个孤字；中文没有单词，但末行只剩一两个字同样难看。 */
+.message-text p,
+.entry-content,
+.chat-welcome p {
+  text-wrap: pretty;
 }

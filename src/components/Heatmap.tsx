@@ -53,7 +53,8 @@ export default function Heatmap({ entries }: { entries: Entry[] }) {
         scale: {
           color: {
             type: "threshold",
-            range: ["#e9ede3", "#b7c6a6", "#8ca576", "#627f52"],
+            // Nord frost 四档：nord5 → 派生 → nord9 → 主色
+            range: ["#e5e9f0", "#b9c8db", "#81a1c1", "#476b96"],
             domain: [1, 2, 4],
           },
         },

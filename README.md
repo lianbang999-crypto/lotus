@@ -35,8 +35,13 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 - SDK 版本：`agents@^0.23`、`@cloudflare/ai-chat@^0.12`（2026-09-16 升级，为实时语音通话所需）；`ai@6.0.202` 与 `@ai-sdk/react@3.0.204` 仍固定以保持原生工具续答兼容。升级时注意 `agents` 把 `@modelcontextprotocol/sdk` 钉在精确版本，增量 `npm install` 会 ERESOLVE，需先卸掉旧 `agents` 子树再一起装。请保留 lockfile，升级后跑真实 Worker 浏览器流程（对话、确认卡、语音条）。
 - `searchDharma` 只调用原有 wenchao 检索，严格验证语料角色和来源地址。来源卡将原文与解释区分。
 - 聊天回复的 Markdown 由 Streamdown 渲染，但**不启用 `rehype-raw`**：模型输出的原始 HTML 以纯文本显示而非进入 DOM。这既是安全边界，也让首屏分包省掉 parse5（Chat 分包 909→739 kB，gzip 266→214）。约束由 `src/lib/rehype-raw-stub.ts`、`vite.config.ts` 的 alias 与 `tests/backend/markdown-safety.test.ts` 三处共同保证，改动前请先看该测试的注释。
-- **三套主题**（2026-09-16）：苔绿（小莲本色）、朝霞（活泼）、素纸（极简、宋体）。设置弹窗里切换，记在 `localStorage`，首屏前内联脚本设 `data-theme` 不闪屏。改色只改 `styles.css` 顶部的 token 块。
+- **北欧极简单主题**（2026-09-17）：全站一套配色，取自 [Nord](https://github.com/nordtheme/nord) 调色板（Snow Storm 做面、Polar Night 做字、Frost 做主色）。主色与错误色按 WCAG AA 加深过，派生值在 `styles.css` 顶部逐个标注。原先的苔绿 / 朝霞 / 素纸三套与设置里的切换器已移除。
 - **语音条**（2026-09-16）：输入框旁「按住说话」，松开即发、上滑取消。客户端把录音重采样成 16 kHz WAV 上传，服务端用 Workers AI `whisper-large-v3-turbo`（`language: zh`）转写，原音按账号前缀存 R2 供回放（支持 Range）。**模型只看到转写文字**，走同一个 `sendMessage`，工具与确认卡一行不动；想改转写用「改一改」。
+- **对话附件**（2026-09-17）：输入框「+」菜单里的「图片 / 文件」，也可直接拖进窗口。一次一个文件原始字节 `POST /api/attachments`（白名单：图片 / PDF / txt / md / docx，最大 10 MB），按账号前缀存 R2 桶 `ATTACHMENTS`，`GET /api/attachments/:id` 只认本账号。消息里存的是 AI SDK 的 `FileUIPart`（同源相对地址）；进模型前 `modelSafeMessages` 把文本附件内容内联、图片在视觉模型下转 data URL、其余给占位说明——**换模型不用动界面与存储**。部署前先 `wrangler r2 bucket create lotus-attachments`。
+- **侧栏收成三个区**（2026-09-18）：和小莲聊聊 / 我的记录 / 法义文库。原来的今日概览、每日功课、我的记录、功过省察、生活账本、我的日历六个入口合成一页 `RecordsHub`（`#records`），类型（全部 / 功课 / 日记 / 笔记 / 功过格 / 账目 / 日历）是页内一行标签；旧地址 `#today` `#journal` `#practice` 等继续有效。「今日概览」那页（营销式 hero、第二个聊天框、点滴列表）整页删除，今天到期的日程条 `TodayStrip` 搬到「全部」标签顶上。圆角收成 6 / 10 / 14 / 20 四档。
+- **两条版式硬规则**（2026-09-18）：全站字号下限 12px（之前 7–11px 用了 145 处，长辈在手机上看不清；层级弱化改用颜色与字距，不用缩字）；触屏设备上手指要按的控件 44px（`@media (pointer: coarse)`，桌面保持紧凑）。核查脚本用 Playwright 跑五个页面：无横向溢出、无裁切、最小字号 12。
+- **设计审查工具**：项目里装了 [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)（MIT，装在全局 `~/.claude/skills/ui-ux-pro-max/`，不进仓库；纯本地 Python 检索，不联网）。它的风格 / 配色推荐对小莲不适用（会给出创业公司落地页那套），有用的是 119 条 UX 准则清单，改界面前可按 `--domain ux` 查一条条对照。
+- **输入框只有三个键**（2026-09-17）：「+」（附件 / 通话 / 手动写一条记录，微信的 + 号语义）、按住说话、发送。通话从 + 菜单进，键盘用户也够得着。
 - **语音朗读**（2026-09-16）：助手消息上的「朗读」键，只在点击时出声。中文 TTS 用 SiliconFlow `FunAudioLLM/CosyVoice2-0.5B`（`OPENAI_BASE_URL` 指向 SiliconFlow 时自动启用，`capabilities.speech`）；按账号 + 文本哈希缓存在 R2。Workers AI melotts 的中文输出经 Whisper 回听不可辨，已弃用（记录见 `docs/ui-validation.md`）。
 - **实时通话**（2026-09-16）：输入框的电话键，`agents@0.23` 的 `withVoice` 混入；识别先试 `WorkersAINova3STT({ language: "zh" })`，起不来退到「能量 VAD + Whisper 分段」；通话与文字共用同一颗脑子（系统提示、近况、工具），**通话里的写入工具只生成待确认提案**，挂断后回对话里点确认；每轮转写与回复并回聊天线程并标「通话」。语音 WebSocket 走同一条 `/api/agent` 握手鉴权，`/agents/*` 仍不开放；小莲不主动呼叫。
 
@@ -52,7 +57,10 @@ Cloudflare Vite 开发时需要本机监听权限。受限环境可设置 `WRANG
 | Markdown 渲染 | [Streamdown](https://github.com/vercel/streamdown) | 2.6.0 · Apache-2.0 | 流式 Markdown、未闭合语法容错、流式光标；**已禁用 `rehype-raw`** |
 | 图标 | [Phosphor Icons](https://phosphoricons.com/) | 2.1.10 · MIT | 全站图标（regular/duotone/light 三种字重） |
 | 样式 | [Tailwind CSS](https://tailwindcss.com/) v4 | 4.3.3 · MIT | 仅作为 `@theme inline` 映射与 `@source` 扫描；组件样式是 `src/styles.css` 手写，颜色全部走 17 个语义 token |
-| 主题 | [tweakcn](https://github.com/jnsahaj/tweakcn) 预设值 | Apache-2.0 | 「朝霞」「素纸」两套主题的基色取自其 *Sunset Horizon* / *Vintage Paper*；未安装 tweakcn，只用了预设里的色值 |
+| 配色 | [Nord](https://github.com/nordtheme/nord) | MIT | 全站 17 个语义 token 的色值来源；未安装包，只用了调色板的色值，派生处在 `styles.css` 标注 |
+| 文件选择 / 拖拽 | [prompt-kit](https://github.com/ibelick/prompt-kit) | MIT | `file-upload.tsx` 复制自其组件，未改逻辑；只交出 `File[]`，不碰上传 |
+| 附件卡片 | [shadcn/ui chat 组件](https://ui.shadcn.com/docs/changelog/2026-06-chat-components) | MIT | `attachment.tsx` 取自 registry，只改了三处占位 import；Button 补了 `icon-xs` 一档 |
+| 语音波形 | [ElevenLabs UI](https://github.com/elevenlabs/ui) | MIT | `waveform.tsx` / `live-waveform.tsx` 复制自其 registry（纯 UI，不依赖 ElevenLabs 服务）；本地改了触屏拖动、高度透传与外部麦克风流 |
 | 样式工具 | `clsx` + `tailwind-merge` + `class-variance-authority` | · MIT / Apache-2.0 | shadcn 式 `cn()` 与 Button 变体 |
 | 日历 | [Schedule-X](https://schedule-x.dev/) | 4.8.0 · MIT | 月视图 / 议程视图（抽屉内，懒加载） |
 | 热力图 | [cal-heatmap](https://cal-heatmap.com/) | 4.2.4 · MIT | 功课与省察足迹（抽屉内，懒加载） |

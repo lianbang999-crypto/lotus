@@ -25,6 +25,12 @@
     {
       "binding": "VOICE_AUDIO",
       "bucket_name": "lotus-voice-audio"
+    },
+    // 对话附件（图片 / PDF / 文本 / Word），按账号前缀 attachments/<accountId>/ 隔离。
+    // 部署前要先建桶：wrangler r2 bucket create lotus-attachments
+    {
+      "binding": "ATTACHMENTS",
+      "bucket_name": "lotus-attachments"
     }
   ],
   "durable_objects": {

@@ -41,7 +41,12 @@ export type SessionInfo = {
   mode: "cloud" | "local" | "unconfigured";
   capabilities: { chat: boolean; entries: boolean; write: boolean; dharma: boolean; voice: boolean;
     /** 语音朗读 / 通话回声：中文 TTS（SiliconFlow CosyVoice2）已配置。通话同时需要 voice。 */
-    speech: boolean; reminders: "in_app" };
+    speech: boolean;
+    /** 附件上传：ATTACHMENTS R2 桶已绑定。 */
+    attachments: boolean;
+    /** 模型能看图：按 MODEL_NAME 判断，换成视觉模型后自动为 true，界面据此决定要不要提示"小莲看不到图片内容"。 */
+    vision: boolean;
+    reminders: "in_app" };
   message?: string;
 };
 /**
@@ -50,3 +55,5 @@ export type SessionInfo = {
  */
 export type VoiceMeta = { audioId: string | null; durationMs: number; call?: boolean };
 export type APIError = { error: string; message: string };
+/** POST /api/attachments 的返回：url 是同源相对地址，随消息的 file part 一起持久化。 */
+export type AttachmentInfo = { id: string; url: string; mediaType: string; filename: string; size: number };
